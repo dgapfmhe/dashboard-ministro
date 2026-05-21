@@ -1,0 +1,67 @@
+name: Pipeline diario · Mercados + TC + Excel refresh
+
+# Yahoo (oro, petróleo, gas, sp500, vix, dow)
+# FRED (DGS10, FedFunds, CPI, INDPRO, EPU, UNRATE)
+# BCRD diario (TCN compra/venta, EMBI, dep. remunerados CP)
+# Regenera Excel y commit si hay cambios.
+# Lun-vie 12:00 UTC (08:00 RD).
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: dashboard-min/requirements.txt
+
+      - name: Instalar dependencias
+        working-directory: dashboard-min
+        run: pip install -r requirements.txt
+
+      - name: Sincronizar catálogo (idempotente)
+        working-directory: dashboard-min
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python sql/upsert_catalogo_supabase.py
+
+      - name: Pipeline diario (mercados + TCN + EMBI + dep. remunerados)
+        working-directory: dashboard-min
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FRED_API_KEY:         ${{ secrets.FRED_API_KEY }}
+        run: python -m pipelines.macro_bcrd.run
+
+      - name: Regenerar Excel con datos actualizados
+        working-directory: dashboard-min
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/build_dashboard_excel.py
+
+      - name: Commit Excel actualizado → Vercel auto-deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard-web/public/dashboard_completo.xlsx
+          if git diff --staged --quiet; then
+            echo "Sin cambios en el Excel — skip commit"
+          else
+            git commit -m "chore(data): refresh diario $(date -u +%Y-%m-%d)"
+            git push
+          fi

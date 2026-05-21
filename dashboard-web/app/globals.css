@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1B3A5C;
+  --color-primary-hover: #14304D;
+  --color-accent: #8B2E2E;
+  --color-bg: #EEF0F4;
+  --color-surface: #FFFFFF;
+  --color-border: #D1D9E0;
+  --color-text: #1A202C;
+  --color-muted: #6B7280;
+  --color-muted-light: #9CA3AF;
+  --color-tab-active: #1B3A5C;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c1c7d0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+input[type='month'] {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  background: white;
+  cursor: pointer;
+}
+input[type='month']:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.recharts-tooltip-wrapper { pointer-events: none; }

@@ -1,0 +1,30 @@
+name: Catálogo · Sincronizar a Supabase
+
+# Re-sube las 478 variables del catálogo canónico a Supabase.
+# Idempotente: usa INSERT...ON CONFLICT DO UPDATE.
+# Disparar manualmente cuando se agregue/modifique una variable en core/catalog_r.py.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "core/catalog_r.py"
+      - "sql/upsert_catalogo_supabase.py"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Upsert catálogo a Supabase
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python sql/upsert_catalogo_supabase.py

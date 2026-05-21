@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard-web-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": [
+        "C:\\Users\\patri\\Desktop\\Dashboard Ministro\\dashboard-web\\node_modules\\next\\dist\\bin\\next",
+        "dev",
+        "--port", "3000",
+        "C:\\Users\\patri\\Desktop\\Dashboard Ministro\\dashboard-web"
+      ],
+      "port": 3000
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd dashboard-web && npm install && npm run build",
+  "outputDirectory": "dashboard-web/.next",
+  "installCommand": "cd dashboard-web && npm install",
+  "framework": "nextjs",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./dashboard-web ./dashboard-web/public ./vercel.json"
+}

@@ -1,0 +1,15 @@
+.env
+.env.local
+*.pyc
+__pycache__/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+data/excel_output/*.xlsx
+data/excel_output/*.xls
+data/raw/
+*.log
+.DS_Store
+.idea/
+.vscode/
