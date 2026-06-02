@@ -91,6 +91,54 @@ def _mes_a_idx(s) -> int | None:
     return None
 
 
+def _parse_bcrd_date_str(s: str) -> date | None:
+    """Parsea fechas-string del BCRD (formato preliminar con asterisco):
+       - 'dic-25*'          → date(2025, 12, 1)
+       - 'ene-2026*'        → date(2026, 1, 1)
+       - '30-abr-26*'       → date(2026, 4, 1)  (snap al inicio del mes)
+       - '11-may-26'        → date(2026, 5, 1)
+       - 'enero 2025'       → date(2025, 1, 1)
+    Snap a día 1 (convención de mensual) y descarta el asterisco preliminar."""
+    if not isinstance(s, str):
+        return None
+    raw = s.strip().rstrip("*").strip()
+    if not raw:
+        return None
+    parts = [p.strip() for p in raw.replace("/", "-").replace(" ", "-").split("-") if p.strip()]
+    if not parts:
+        return None
+    # Buscar el mes (alguna parte debe ser nombre de mes en español)
+    mes_idx = None
+    mes_pos = None
+    for i, p in enumerate(parts):
+        m = _mes_a_idx(p)
+        if m is not None:
+            mes_idx = m
+            mes_pos = i
+            break
+    if mes_idx is None or mes_pos is None:
+        return None
+    # El año es el ÚLTIMO número de la cadena (formato BCRD: 'dic-25*' o
+    # '30-abr-26*'; siempre el año va al final, NO el día). Iteramos al revés.
+    anio = None
+    for i in range(len(parts) - 1, -1, -1):
+        if i == mes_pos:
+            continue
+        try:
+            n = int(parts[i])
+            if 0 <= n <= 99:
+                anio = 2000 + n if n < 50 else 1900 + n
+                break
+            if 1990 <= n <= 2100:
+                anio = n
+                break
+        except ValueError:
+            continue
+    if anio is None:
+        return None
+    return date(anio, mes_idx, 1)
+
+
 def _add_meses(start_year: int, start_month: int, n: int) -> list[date]:
     """Genera n meses consecutivos a partir de (year, month)."""
     out = []
@@ -996,12 +1044,11 @@ _CREDITO_MAP: list[tuple[str, str]] = [
 
 def parser_credito_sect(path: Path) -> pd.DataFrame:
     try:
-        raw = pd.read_excel(path, header=None)  # no dtype=object: needed for Timestamp detection
+        raw = pd.read_excel(path, header=None)
     except Exception as e:
         log.warning("Crédito sector no se pudo leer: %s", e)
         return pd.DataFrame()
 
-    # Find header row: col 1 is a date-like object
     def _is_date(v) -> bool:
         return isinstance(v, (pd.Timestamp, _dt.datetime, _dt.date))
 
@@ -1014,21 +1061,26 @@ def parser_credito_sect(path: Path) -> pd.DataFrame:
         log.warning("Crédito sector: no se encontró fila de fechas")
         return pd.DataFrame()
 
-    # Extract dates from cols 1+
+    # Extract dates: Timestamp/datetime → date; string preliminar 'dic-25*' → date
+    # Snap a inicio de mes (día 1) para alinear con otras series mensuales.
     date_cols: dict[int, date] = {}
+    n_prelim = 0
     for j in range(1, raw.shape[1]):
         ts = raw.iloc[header_row, j]
         if _is_date(ts):
-            if isinstance(ts, _dt.datetime):
-                date_cols[j] = ts.date()
-            elif isinstance(ts, _dt.date):
-                date_cols[j] = ts
-            else:
-                date_cols[j] = ts.date()
+            d = ts.date() if isinstance(ts, _dt.datetime) else ts if isinstance(ts, _dt.date) else ts.date()
+            date_cols[j] = date(d.year, d.month, 1)  # snap a día 1
+        elif isinstance(ts, str):
+            d = _parse_bcrd_date_str(ts)
+            if d is not None:
+                date_cols[j] = d
+                n_prelim += 1
 
     if not date_cols:
         log.warning("Crédito sector: 0 fechas detectadas")
         return pd.DataFrame()
+    if n_prelim > 0:
+        log.info("Crédito sector: %d fechas preliminares (con *) procesadas", n_prelim)
 
     # Find sector rows by keyword
     frames: list[pd.DataFrame] = []
@@ -1387,17 +1439,26 @@ def parser_credito_osd(path: Path) -> pd.DataFrame:
         log.warning("credito_osd no se pudo leer: %s", e)
         return pd.DataFrame()
 
-    # Row 4: fechas Timestamp. Snap a inicio de mes para evitar mid-mes.
+    # Row 4: fechas. Snap a inicio de mes. Acepta tanto Timestamp como
+    # string preliminar tipo 'dic-25*', '30-abr-26*' (cifras provisionales).
     col_dates: dict[int, date] = {}
+    n_prelim = 0
     for j in range(1, raw.shape[1]):
         v = raw.iloc[4, j] if raw.shape[0] > 4 else None
         if isinstance(v, pd.Timestamp):
             col_dates[j] = date(v.year, v.month, 1)
         elif isinstance(v, _dt.datetime):
             col_dates[j] = date(v.year, v.month, 1)
+        elif isinstance(v, str):
+            d = _parse_bcrd_date_str(v)
+            if d is not None:
+                col_dates[j] = d
+                n_prelim += 1
     if not col_dates:
         log.warning("credito_osd: 0 fechas en fila 4")
         return pd.DataFrame()
+    if n_prelim > 0:
+        log.info("credito_osd: %d fechas preliminares (con *) procesadas", n_prelim)
 
     filas: list[dict] = []
     for row_idx, vid, _ in _OSD_MAP:
