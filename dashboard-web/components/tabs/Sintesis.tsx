@@ -63,17 +63,14 @@ export default function Sintesis() {
 
   /* ── 2. Inflación: general + subyacente + meta 4±1 ──────────────── */
   const inflacionData = useMemo(() => {
+    // IPC YoY ya guardado en % (post-fix Jun 2026). Defensive: si llega
+    // alguna obs vieja en fracción (abs < 1), la multiplicamos × 100.
+    const genRaw = (series.ipc_yoy ?? []).filter(d => isFinite(d.valor))
     const gen: Record<string, number> = {}
-    const sub: Record<string, number> = {}
-    for (const d of (series.ipc_yoy ?? [])) if (isFinite(d.valor)) gen[d.fecha.slice(0, 7)] = d.valor
-    for (const d of (series.ipc_sub ?? [])) {
-      if (isFinite(d.valor)) {
-        // ipc_sub puede venir como índice; el YoY se calcula si es índice
-      }
-    }
-    // Calculo YoY de ipc_sub (índice) si no viene como YoY
+    for (const d of genRaw) gen[d.fecha.slice(0, 7)] = Math.abs(d.valor) < 1 ? d.valor * 100 : d.valor
+
+    // IPC Subyacente: viene como ÍNDICE (base 2019-2020 ≈ 100..140). Calcular YoY.
     const subRaw = (series.ipc_sub ?? []).filter(d => isFinite(d.valor))
-    // Detectar: si max(ipc_sub) > 20 es índice → calcular YoY
     const isIndex = subRaw.length > 0 && Math.max(...subRaw.map(d => d.valor)) > 20
     const subYoY = isIndex ? yoyGrowth(subRaw) : subRaw
     const subMap: Record<string, number> = {}

@@ -98,9 +98,9 @@ MENSUALES: list[dict] = [
     _v("ipc_nt",         "IPC No Transables",               "Precios",  "mensual", "índice",  "BCRD"),
     _v("meta",           "Meta de Inflación",               "Precios",  "mensual", "%",       "BCRD"),
     _v("ipc_yoy",        "Inflación interanual",            "Precios",  "mensual", "%",       "BCRD",
-       tipo="derivada", formula="ipc_rd / lag(ipc_rd, 12) - 1"),
+       tipo="derivada", formula="(ipc_rd / lag(ipc_rd, 12) - 1) * 100"),
     _v("ipc_mom",        "Inflación mensual",               "Precios",  "mensual", "%",       "BCRD",
-       tipo="derivada", formula="ipc_rd / lag(ipc_rd, 1) - 1"),
+       tipo="derivada", formula="(ipc_rd / lag(ipc_rd, 1) - 1) * 100"),
 
     # ------- Mercado Cambiario (mensual: promedio del mes) -------
     _v("tcn_compra_m",   "TC Nominal Compra (prom mes)",    "Mercado Cambiario", "mensual", "RD$/US$", "BCRD"),
