@@ -31,6 +31,7 @@ export default function TipoCambio() {
   const [r2, onR2] = useRange(def)
   const [r3, onR3] = useRange(def)
   const [r4, onR4] = useRange(def)
+  const [r5, onR5] = useRange(def)
 
   /* Depreciación interanual diaria */
   const tcnVentaDiaria = series.tcn_venta ?? []
@@ -109,6 +110,44 @@ export default function TipoCambio() {
 
   const xFmtM = (v: string) => { const [y,m]=v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }
 
+  /* ── Volatilidad TCN (metodología BCRD) ─────────────────────────────
+   *   1. r_t = ln(P_t) − ln(P_{t−1})        ← log-returns diarios
+   *   2. σ_t = std móvil 260 días de r_t    ← std de los últimos 260 días
+   *   3. vol_t = σ_t × 2.33                  ← intervalo de confianza 99%
+   * Output en % (multiplicado × 100 para visualización amigable). */
+  const volatilidadTCN = useMemo(() => {
+    const data = (series.tcn_venta ?? [])
+      .filter(d => isFinite(d.valor) && d.valor > 0)
+      .slice() // copia
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    const W = 260
+    if (data.length < W + 1) return [] as { fecha: string; valor: number }[]
+
+    // log-returns
+    const r: { fecha: string; valor: number }[] = []
+    for (let i = 1; i < data.length; i++) {
+      r.push({ fecha: data[i].fecha, valor: Math.log(data[i].valor) - Math.log(data[i - 1].valor) })
+    }
+
+    // std móvil 260
+    const out: { fecha: string; valor: number }[] = []
+    for (let i = W - 1; i < r.length; i++) {
+      let sum = 0, sumSq = 0
+      for (let j = i - W + 1; j <= i; j++) {
+        sum += r[j].valor
+        sumSq += r[j].valor * r[j].valor
+      }
+      const mean = sum / W
+      const variance = (sumSq - W * mean * mean) / (W - 1)  // sample std
+      const std = Math.sqrt(Math.max(0, variance))
+      out.push({
+        fecha: r[i].fecha,
+        valor: Math.round(std * 2.33 * 10000) / 100,  // × 100 para mostrar como %
+      })
+    }
+    return out
+  }, [series.tcn_venta])
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -168,6 +207,22 @@ export default function TipoCambio() {
           yLeftFormatter={v => `${v.toFixed(2)}`}
           yRightFormatter={v => `${v?.toFixed(1)}%`}
           xFormatter={xFmtM}
+        />
+      </ChartWrapper>
+
+      {/* G5 Volatilidad TCN — metodología BCRD */}
+      <ChartWrapper
+        title="Volatilidad del Tipo de Cambio (metodología BCRD)"
+        subtitle="σ móvil 260 días de ln(P_t) − ln(P_{t−1}), × 2.33 (intervalo confianza 99%)"
+        from={r5[0]} to={r5[1]} isLoading={loading} onRangeChange={onR5}
+        downloadName="volatilidad-tcn" fullWidth>
+        <LineChartSimple
+          data={volatilidadTCN
+            .filter(d => d.fecha.slice(0, 7) >= r5[0] && d.fecha.slice(0, 7) <= r5[1])
+            .map(d => ({ fecha: d.fecha.slice(0, 10), volatilidad: d.valor }))}
+          series={[{ key: 'volatilidad', label: 'Volatilidad TCN (%)', color: C.red, strokeWidth: 2 }]}
+          unit="%" yFormatter={v => `${v.toFixed(2)}%`}
+          xFormatter={v => { const [y, m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
         />
       </ChartWrapper>
     </div>
