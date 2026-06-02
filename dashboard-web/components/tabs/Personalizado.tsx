@@ -107,11 +107,37 @@ export default function Personalizado() {
   const [seriesMap, setSeriesMap] = useState<SeriesMap>({})
   const [loadingSeries, setLoadingSeries] = useState(false)
 
-  /* Controles del chart */
+  /* Controles del chart principal */
   const [chartKind, setChartKind] = useState<ChartKind>('line')
   const [freq, setFreq] = useState<FreqAgg>('auto')
   const [transform, setTransform] = useState<Transform>('nivel')
   const [range, setRange] = useState<[string, string]>([monthsAgo(60), today()])
+
+  /* Paneles adicionales — snapshots independientes del panel principal.
+   * Cada panel guarda su propia combinación de variables + tipo + transformación.
+   * Permite comparar varios gráficos simultáneamente sin perder la selección. */
+  type SavedPanel = {
+    id: number
+    title: string
+    selected: string[]
+    chartKind: ChartKind
+    freq: FreqAgg
+    transform: Transform
+    range: [string, string]
+  }
+  const [savedPanels, setSavedPanels] = useState<SavedPanel[]>([])
+  const saveCurrentAsPanel = () => {
+    if (selected.length === 0) return
+    const id = Date.now()
+    const names = selected.map(s => catalog.find(c => c.id === s)?.nombre ?? s).slice(0, 2)
+    const title = names.join(' + ') + (selected.length > 2 ? ` (+${selected.length - 2})` : '')
+    setSavedPanels(prev => [...prev, {
+      id, title, selected: [...selected],
+      chartKind, freq, transform, range: [...range] as [string, string],
+    }])
+  }
+  const removePanel = (id: number) =>
+    setSavedPanels(prev => prev.filter(p => p.id !== id))
 
   /* Carga inicial: catálogo + summaries en paralelo */
   useEffect(() => {
@@ -164,35 +190,48 @@ export default function Personalizado() {
   const toggle = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
-  /* Transform + merge. Excluye NaN/inválidos para que recharts no pinte
-   * caídas a cero en colas con observaciones nulas. */
+  /* Detecta si la salida del transform/agregado es DIARIA (necesario para
+   * que el tooltip muestre cada día y no colapse mes). */
+  const isDailyOutput = useMemo(() => {
+    if (freq === 'mensual' || freq === 'trimestral' || freq === 'anual') return false
+    // freq === 'auto' (o 'diaria'): es diario si TODAS las series seleccionadas
+    // tienen frecuencia diaria en el catálogo.
+    if (selected.length === 0) return false
+    return selected.every(id => {
+      const v = catalog.find(c => c.id === id)
+      return v?.frecuencia === 'diaria'
+    })
+  }, [freq, selected, catalog])
+
+  /* Transform + merge. Excluye NaN/inválidos. El nivel de granularidad de la
+   * fecha resultante depende de si todas las series son diarias:
+   *   - Diaria → YYYY-MM-DD (cada tick visible en tooltip)
+   *   - Mensual/Trim/Anual → YYYY-MM (un punto por mes) */
   const merged = useMemo<MergedPoint[]>(() => {
     if (selected.length === 0) return []
     const tr: Record<string, DataPoint[]> = {}
+    const grain = isDailyOutput ? 10 : 7  // 10 = YYYY-MM-DD, 7 = YYYY-MM
     for (const id of selected) {
       let s = seriesMap[id] ?? []
       if (s.length === 0) continue
-      // Excluir NaN/null/inf en la fuente antes de transformar
       s = s.filter(d => d.valor != null && isFinite(d.valor))
       if (s.length === 0) continue
       s = aggregateByFreq(s, freq)
       s = applyTransform(s, transform)
       s = s.filter(d => d.valor != null && isFinite(d.valor))
-      tr[id] = s.map(d => ({ ...d, fecha: d.fecha.slice(0, 10) }))
+      tr[id] = s.map(d => ({ ...d, fecha: d.fecha.slice(0, grain) }))
     }
     const keys = Object.keys(tr)
     if (keys.length === 0) return []
-    // merge produce filas con null cuando una serie no tiene ese mes —
-    // recharts las renderiza como "gap" en líneas (correcto) en vez de 0.
     return merge(tr, keys).map(row => {
-      const out: MergedPoint = { fecha: (row.fecha as string).slice(0, 7) }
+      const out: MergedPoint = { fecha: (row.fecha as string).slice(0, grain) }
       for (const k of keys) {
         const v = row[k]
         if (typeof v === 'number' && isFinite(v)) out[k] = v
       }
       return out
     })
-  }, [selected, seriesMap, freq, transform])
+  }, [selected, seriesMap, freq, transform, isDailyOutput])
 
   const filteredData = useMemo(
     () => filterMergedByRange(merged, range[0], range[1]),
@@ -213,8 +252,12 @@ export default function Personalizado() {
   }
   const xFmt = (v: string) => {
     if (!v || v.length < 7) return v
-    const [y, m] = v.split('-')
-    const meses = ['E','F','M','A','M','J','J','A','S','O','N','D']
+    const [y, m, d] = v.split('-')
+    const meses = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+    // Si es diario: mostrar "D MMM" (ej "15 May"); si es mensual: "M'YY"
+    if (isDailyOutput && d) {
+      return `${+d} ${meses[+m - 1]}`
+    }
     return `${meses[+m - 1]}'${y.slice(2)}`
   }
 
@@ -352,6 +395,22 @@ export default function Personalizado() {
           </div>
         </div>
 
+        {/* Botón guardar panel */}
+        <div className="flex items-center justify-end -mb-1">
+          <button
+            type="button"
+            disabled={selected.length === 0}
+            onClick={saveCurrentAsPanel}
+            className={[
+              'text-[10px] px-3 py-1 rounded border transition-colors',
+              selected.length === 0
+                ? 'border-[#D1D9E0] text-[#9CA3AF] cursor-not-allowed'
+                : 'border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#1B3A5C] hover:text-white',
+            ].join(' ')}
+            title="Guarda el gráfico actual como un panel separado y libera la selección para crear otro"
+          >📌 Guardar como panel</button>
+        </div>
+
         <ChartWrapper
           title={selected.length === 1
             ? (catalog.find(c => c.id === selected[0])?.nombre ?? 'Variable')
@@ -430,7 +489,131 @@ export default function Personalizado() {
             </div>
           </div>
         )}
+
+        {/* Paneles guardados (multi-chart) */}
+        {savedPanels.length > 0 && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold text-[#1A202C]">
+                Paneles guardados ({savedPanels.length})
+              </h3>
+              <button
+                onClick={() => setSavedPanels([])}
+                className="text-[10px] text-[#8B2E2E] hover:underline">
+                Limpiar todos
+              </button>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              {savedPanels.map(p => (
+                <SavedPanelView
+                  key={p.id} panel={p} catalog={catalog} seriesMap={seriesMap}
+                  onRemove={() => removePanel(p.id)} />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
+    </div>
+  )
+}
+
+/* ─── Componente del panel guardado (mini-chart independiente) ─── */
+interface SavedPanelProps {
+  panel: {
+    id: number
+    title: string
+    selected: string[]
+    chartKind: ChartKind
+    freq: FreqAgg
+    transform: Transform
+    range: [string, string]
+  }
+  catalog: CatalogVariable[]
+  seriesMap: SeriesMap
+  onRemove: () => void
+}
+
+function SavedPanelView({ panel, catalog, seriesMap, onRemove }: SavedPanelProps) {
+  const { selected, chartKind, freq, transform, range } = panel
+
+  const isDaily = freq !== 'mensual' && freq !== 'trimestral' && freq !== 'anual' &&
+    selected.every(id => catalog.find(c => c.id === id)?.frecuencia === 'diaria')
+
+  const merged = useMemo<MergedPoint[]>(() => {
+    if (selected.length === 0) return []
+    const grain = isDaily ? 10 : 7
+    const tr: Record<string, DataPoint[]> = {}
+    for (const id of selected) {
+      let s = seriesMap[id] ?? []
+      if (s.length === 0) continue
+      s = s.filter(d => d.valor != null && isFinite(d.valor))
+      s = aggregateByFreq(s, freq)
+      s = applyTransform(s, transform)
+      s = s.filter(d => d.valor != null && isFinite(d.valor))
+      tr[id] = s.map(d => ({ ...d, fecha: d.fecha.slice(0, grain) }))
+    }
+    const keys = Object.keys(tr)
+    if (keys.length === 0) return []
+    return merge(tr, keys).map(row => {
+      const out: MergedPoint = { fecha: (row.fecha as string).slice(0, grain) }
+      for (const k of keys) {
+        const v = row[k]
+        if (typeof v === 'number' && isFinite(v)) out[k] = v
+      }
+      return out
+    })
+  }, [selected, seriesMap, freq, transform, isDaily])
+
+  const filtered = useMemo(
+    () => filterMergedByRange(merged, range[0], range[1]),
+    [merged, range])
+
+  const seriesDef = selected.map((id, i) => {
+    const v = catalog.find(c => c.id === id)
+    return { key: id, label: v?.nombre ?? id, color: PALETTE[i % PALETTE.length] }
+  })
+
+  const yFmt = (v: number) => {
+    if (transform === 'yoy' || transform === 'mom') return `${v.toFixed(2)}%`
+    return fmtValue(v)
+  }
+  const xFmt = (v: string) => {
+    if (!v || v.length < 7) return v
+    const [y, m, d] = v.split('-')
+    const meses = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+    if (isDaily && d) return `${+d} ${meses[+m - 1]}`
+    return `${meses[+m - 1]}'${y.slice(2)}`
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-[#D1D9E0] shadow-sm p-3 relative">
+      <div className="flex items-start justify-between mb-1">
+        <div className="min-w-0">
+          <h4 className="text-[12px] font-semibold text-[#1A202C] truncate">{panel.title}</h4>
+          <p className="text-[10px] text-[#6B7280]">
+            {chartKind} · {freq} · {transform === 'nivel' ? 'nivel' : transform.toUpperCase()}
+          </p>
+        </div>
+        <button onClick={onRemove}
+          title="Quitar panel"
+          className="text-[10px] text-[#8B2E2E] hover:bg-[#FEE] rounded px-1.5 py-0.5">✕</button>
+      </div>
+      <div style={{ height: 240 }}>
+        {chartKind === 'bar' && selected.length === 1 ? (
+          <BarChartVert
+            data={(filtered as { fecha: string; [k: string]: number | string }[])
+              .filter(d => typeof d[selected[0]] === 'number' && isFinite(d[selected[0]] as number))
+              .map(d => ({ fecha: d.fecha, valor: Number(d[selected[0]]) }))}
+            color={PALETTE[0]} xFormatter={xFmt} yFormatter={yFmt}
+            label={catalog.find(c => c.id === selected[0])?.nombre ?? selected[0]}/>
+        ) : (
+          <LineChartSimple
+            data={filtered as Record<string, number | string>[]}
+            series={seriesDef}
+            xFormatter={xFmt} yFormatter={yFmt}
+            unit={transform === 'yoy' || transform === 'mom' ? '%' : ''}/>
+        )}
+      </div>
     </div>
   )
 }

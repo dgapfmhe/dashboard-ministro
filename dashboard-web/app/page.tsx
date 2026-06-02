@@ -8,8 +8,10 @@ import Tasas from '@/components/tabs/Tasas'
 import TipoCambio from '@/components/tabs/TipoCambio'
 import SectorElectrico from '@/components/tabs/SectorElectrico'
 import Personalizado from '@/components/tabs/Personalizado'
+import Sintesis from '@/components/tabs/Sintesis'
 
 const TABS = [
+  { id: 'sintesis',             label: 'Síntesis Macro' },
   { id: 'externo',              label: 'Sector Externo' },
   { id: 'depositos-rem',        label: 'Depósitos Remunerados CP' },
   { id: 'depositos-prestamos',  label: 'Depósitos y Préstamos' },
@@ -22,7 +24,7 @@ const TABS = [
 type TabId = typeof TABS[number]['id']
 
 export default function Home() {
-  const [active, setActive] = useState<TabId>('externo')
+  const [active, setActive] = useState<TabId>('sintesis')
   // Renderizar buttons SOLO después del mount del cliente. El servidor envía
   // un placeholder; el navegador hidrata y entonces renderiza los buttons.
   // Esto evita que extensiones (Bitwarden, autofill) inyecten `fdprocessedid`
@@ -56,6 +58,7 @@ export default function Home() {
 
       {/* ── Tab content ── */}
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5">
+        {mounted && active === 'sintesis'            && <Sintesis />}
         {mounted && active === 'externo'             && <SectorExterno />}
         {mounted && active === 'depositos-rem'       && <DepositosRemunerados />}
         {mounted && active === 'depositos-prestamos' && <DepositosPrestamos />}
