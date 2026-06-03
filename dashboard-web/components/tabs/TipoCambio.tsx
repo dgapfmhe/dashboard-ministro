@@ -210,97 +210,38 @@ export default function TipoCambio() {
         />
       </ChartWrapper>
 
-      {/* G6 Card: Tipo de cambio peso/euro (cross con EUR/USD de Yahoo) */}
-      <div className="bg-white rounded-xl border border-[#D1D9E0] shadow-sm p-4 flex flex-col">
-        <h3 className="text-[13px] font-semibold text-[#1A202C]">Tipo de Cambio Peso / Euro</h3>
-        <p className="text-[10px] text-[#6B7280] mb-3">
-          Cruce calculado: DOP/EUR = TCN venta (DOP/USD) × USD/EUR (Yahoo EURUSD=X)
-        </p>
-        {(() => {
-          const tcnD = (series.tcn_venta ?? []).filter(d => isFinite(d.valor) && d.valor > 0)
-          const eur = (series.eur_usd ?? []).filter(d => isFinite(d.valor) && d.valor > 0)
-          if (tcnD.length === 0 || eur.length === 0) {
-            return <p className="text-[11px] text-[#9CA3AF] italic">Datos no disponibles</p>
+      {/* G6 Línea diaria: Tipo de cambio peso/euro (cross con EUR/USD de Yahoo) */}
+      {(() => {
+        const tcnD = (series.tcn_venta ?? []).filter(d => isFinite(d.valor) && d.valor > 0)
+        const eur = (series.eur_usd ?? []).filter(d => isFinite(d.valor) && d.valor > 0)
+        const eurMap: Record<string, number> = {}
+        for (const d of eur) eurMap[d.fecha.slice(0, 10)] = d.valor
+        const cruceEUR: { fecha: string; valor: number }[] = []
+        for (const d of tcnD) {
+          const ue = eurMap[d.fecha.slice(0, 10)]
+          if (ue && isFinite(ue)) {
+            cruceEUR.push({ fecha: d.fecha.slice(0, 10), valor: d.valor * ue })
           }
-          // Indexar por fecha YYYY-MM-DD para hacer match exacto
-          const eurMap: Record<string, number> = {}
-          for (const d of eur) eurMap[d.fecha.slice(0, 10)] = d.valor
-          // Tomar los últimos N tcn que tengan match con EUR
-          const matched: { fecha: string; dop_usd: number; usd_eur: number; dop_eur: number }[] = []
-          for (let i = tcnD.length - 1; i >= 0 && matched.length < 30; i--) {
-            const f = tcnD[i].fecha.slice(0, 10)
-            const usd_eur = eurMap[f]
-            if (usd_eur && isFinite(usd_eur)) {
-              matched.unshift({
-                fecha: f, dop_usd: tcnD[i].valor, usd_eur,
-                dop_eur: tcnD[i].valor * usd_eur,
-              })
-            }
-          }
-          if (matched.length === 0) {
-            return <p className="text-[11px] text-[#9CA3AF] italic">Sin overlap fechas TCN/EUR</p>
-          }
-          const last = matched[matched.length - 1]
-          // Comparación vs hace ~30 días
-          const prev = matched[0]
-          const deltaPct = ((last.dop_eur - prev.dop_eur) / prev.dop_eur) * 100
-          // 12-meses atrás
-          const yearAgoDate = new Date(last.fecha)
-          yearAgoDate.setFullYear(yearAgoDate.getFullYear() - 1)
-          const yearAgoStr = yearAgoDate.toISOString().slice(0, 10)
-          // Buscar el match más cercano hace un año
-          let yearAgoVal: number | null = null
-          for (const d of tcnD) {
-            if (d.fecha.slice(0, 10) >= yearAgoStr) {
-              const ue = eurMap[d.fecha.slice(0, 10)]
-              if (ue) { yearAgoVal = d.valor * ue; break }
-            }
-          }
-          const yoyPct = yearAgoVal ? ((last.dop_eur - yearAgoVal) / yearAgoVal) * 100 : null
-          return (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[44px] font-bold text-[#1B3A5C] tabular-nums leading-none">
-                  {last.dop_eur.toFixed(2)}
-                </span>
-                <span className="text-[14px] text-[#6B7280] font-medium">RD$/€</span>
-              </div>
-              <div className="text-[10px] text-[#9CA3AF]">
-                Último: {last.fecha} · TCN venta {last.dop_usd.toFixed(2)} · USD/EUR {last.usd_eur.toFixed(4)}
-              </div>
-              <table className="w-full text-[11px] mt-1 border-t border-[#F0F2F5] pt-2">
-                <tbody>
-                  <tr>
-                    <td className="py-1 text-[#6B7280]">Variación últimos 30 días</td>
-                    <td className="py-1 text-right tabular-nums font-semibold"
-                      style={{ color: deltaPct >= 0 ? '#8B2E2E' : '#2C7A7B' }}>
-                      {deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(2)}%
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-1 text-[#6B7280]">Variación interanual</td>
-                    <td className="py-1 text-right tabular-nums font-semibold"
-                      style={{ color: yoyPct == null ? '#9CA3AF' : yoyPct >= 0 ? '#8B2E2E' : '#2C7A7B' }}>
-                      {yoyPct == null ? '—' : (yoyPct >= 0 ? '+' : '') + yoyPct.toFixed(2) + '%'}
-                    </td>
-                  </tr>
-                  {[7, 14, 30].map(n => {
-                    const idx = Math.max(0, matched.length - 1 - n)
-                    const ref = matched[idx]
-                    if (!ref) return null
-                    return (
-                      <tr key={n} className="border-t border-[#F8F9FB]">
-                        <td className="py-1 text-[#6B7280]">Hace {n} días</td>
-                        <td className="py-1 text-right tabular-nums">{ref.dop_eur.toFixed(2)} RD$/€</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
-        })()}
-      </div>
+        }
+        const last = cruceEUR[cruceEUR.length - 1]
+        return (
+          <ChartWrapper title="Tipo de Cambio Peso / Euro"
+            subtitle="DOP/EUR diario = TCN venta (DOP/USD) × USD/EUR (Yahoo EURUSD=X)"
+            from={r2[0]} to={r2[1]} isLoading={loading} onRangeChange={onR2}
+            downloadName="tcn-peso-euro"
+            lastValue={last
+              ? { label: 'Último', value: last.valor, fecha: last.fecha, unit: 'RD$/€',
+                  valueFormatter: v => v.toFixed(2) }
+              : undefined}>
+            <LineChartSimple
+              data={cruceEUR.filter(d => d.fecha.slice(0, 7) >= r2[0] && d.fecha.slice(0, 7) <= r2[1])}
+              series={[{ key: 'valor', label: 'DOP/EUR', color: C.purple ?? '#9C27B0', strokeWidth: 2 }]}
+              unit="RD$/€" yFormatter={v => v.toFixed(2)}
+              xFormatter={xFmtM}
+            />
+          </ChartWrapper>
+        )
+      })()}
 
       {/* G5 Volatilidad TCN — metodología BCRD */}
       <ChartWrapper

@@ -1612,6 +1612,31 @@ def parser_encaje(path: Path) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Wrapper para llegada_tur: filtra observaciones espurias y proyecciones
+# futuras que el Excel BCRD incluye después del último mes real.
+# ---------------------------------------------------------------------------
+def _llegada_tur_wrapper(path: Path) -> pd.DataFrame:
+    df = parser_filas_mes(
+        path, "se_cc_numtur", skip=7, mes_col=0, val_col=1,
+        start_year=1984, start_month=1,
+    )
+    if df.empty:
+        return df
+    df["fecha"] = pd.to_datetime(df["fecha"])
+    today_p1m = pd.Timestamp.today().normalize() + pd.DateOffset(months=1)
+    # Drop fechas futuras (BCRD a veces incluye proyecciones)
+    df = df[df["fecha"] <= today_p1m]
+    # Drop valores espurios en fechas recientes:
+    #   - post-2010 con < 100k es claramente erróneo (mínimo histórico ≈ 200k)
+    #   - pre-2010 con < 50k es plausible (data antigua, RD tenía menos turistas)
+    mask_post2010_bajo = (df["fecha"] >= "2010-01-01") & (df["valor"] < 100_000)
+    df = df[~mask_post2010_bajo]
+    log.info("llegada_tur: %d filas (post-filtro espurios + futuros)", len(df))
+    df["fecha"] = df["fecha"].dt.date
+    return df.reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
 # Registro slug → parser
 # ---------------------------------------------------------------------------
 # Mapeos calibrados contra Data_dgapf 2.R. mes_col/val_col son índices 0-based
@@ -1636,10 +1661,7 @@ PARSER_REGISTRY: dict[str, Callable[[Path], pd.DataFrame]] = {
         p, "rem_fam", skip=5, multiplicador=1 / 1_000_000,
     ),
     # ---------- Sector turismo ----------
-    "llegada_tur":   lambda p: parser_filas_mes(
-        p, "se_cc_numtur", skip=7, mes_col=0, val_col=1,
-        start_year=1984, start_month=1,
-    ),
+    "llegada_tur":   lambda p: _llegada_tur_wrapper(p),
     # ---------- Mercado cambiario ----------
     "tcn_dia":       parser_tcn_dia,
     "tc_ent_fin":    parser_tc_ent_fin,

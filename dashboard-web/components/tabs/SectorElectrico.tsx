@@ -260,19 +260,61 @@ export default function SectorElectrico() {
         />
       </ChartWrapper>
 
-      {/* G8 Balance Operacional anual */}
-      <ChartWrapper title="Balance Operacional Anual"
-        subtitle="MM RD$ — por distribuidora"
-        from={rFin[0]} to={rFin[1]} onRangeChange={onRFin}
-        isLoading={loading} downloadName="balance-operacional-anual">
-        <LineChartSimple
-          data={filterMergedByRange(defOpAnnual, rFin[0], rFin[1])}
-          series={DEF_OP_IDS.map((id, i) => ({
-            key: id, label: DIST_LABELS[id.split('_').pop() as string], color: DIST_COLORS[i],
-          }))}
-          unit="MM RD$" yFormatter={v => `${(v/1000).toFixed(1)}B`}
-          xFormatter={xFmtY}
-        />
+      {/* G8 Balance Operacional anual — comparativa entre distribuidoras */}
+      <ChartWrapper title="Balance Operacional Anual por Distribuidora"
+        subtitle="MM US$ del año fiscal vigente (Anexo MEM publica solo el año actual)"
+        hideRange isLoading={loading} downloadName="balance-operacional-anual">
+        {(() => {
+          // El Anexo MEM trae solo 1 año fiscal por archivo. Lo presentamos como
+          // barras horizontales agrupadas por distribuidora.
+          const lastByVar: Record<string, number | null> = {}
+          let anioRef = ''
+          for (const id of DEF_OP_IDS) {
+            const arr = (series[id] ?? []).filter(d => isFinite(d.valor))
+            if (arr.length === 0) { lastByVar[id] = null; continue }
+            arr.sort((a, b) => a.fecha.localeCompare(b.fecha))
+            const last = arr[arr.length - 1]
+            lastByVar[id] = last.valor
+            if (!anioRef) anioRef = last.fecha.slice(0, 4)
+          }
+          const haveData = Object.values(lastByVar).some(v => v != null)
+          if (!haveData) {
+            return <div className="flex items-center justify-center h-full text-[#9CA3AF] text-sm">Sin datos</div>
+          }
+          return (
+            <div className="flex flex-col gap-1.5 py-2 px-3">
+              <div className="text-[10px] text-[#6B7280] uppercase tracking-wider font-semibold mb-1">
+                Año fiscal: {anioRef}
+              </div>
+              {DEF_OP_IDS.map((id, i) => {
+                const v = lastByVar[id]
+                const label = DIST_LABELS[id.split('_').pop() as string]
+                const color = DIST_COLORS[i]
+                if (v == null) return null
+                // Escala: max absoluto entre todos los valores
+                const maxAbs = Math.max(...Object.values(lastByVar).filter(x => x != null).map(x => Math.abs(x as number)))
+                const widthPct = maxAbs > 0 ? Math.min(100, (Math.abs(v) / maxAbs) * 95) : 0
+                return (
+                  <div key={id} className="flex items-center gap-3">
+                    <div className="w-20 text-[11px] font-medium text-[#1A202C]">{label}</div>
+                    <div className="flex-1 relative h-7 bg-[#F8F9FB] rounded border border-[#F0F2F5]">
+                      <div className={`absolute top-0 ${v >= 0 ? 'left-1/2' : 'right-1/2'} h-full rounded ${v >= 0 ? '' : 'border-r-2 border-white'}`}
+                        style={{ width: `${widthPct / 2}%`, background: color, opacity: 0.85 }} />
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 h-full w-px bg-[#9CA3AF]" />
+                    </div>
+                    <div className="w-28 text-right tabular-nums text-[11px] font-semibold"
+                      style={{ color: v >= 0 ? '#2C7A7B' : '#8B2E2E' }}>
+                      {v >= 0 ? '+' : ''}{v.toFixed(1)} MM US$
+                    </div>
+                  </div>
+                )
+              })}
+              <p className="text-[9px] text-[#9CA3AF] italic mt-2">
+                Fuente: Anexo MEM (datos anuales). Para histórico se requieren Anexos previos.
+              </p>
+            </div>
+          )
+        })()}
       </ChartWrapper>
 
       {/* Resumen distribuidoras */}
