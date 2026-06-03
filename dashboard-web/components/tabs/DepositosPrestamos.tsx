@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, movingAverage, yoyGrowth, filterByRange, filterMergedByRange, monthsAgo } from '@/lib/utils'
+import { merge, movingAverage, yoyGrowth, filterByRange, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import LineChartSimple from '@/components/charts/LineChartSimple'
@@ -108,8 +108,8 @@ export default function DepositosPrestamos() {
       </ChartWrapper>
 
       {/* G6 Crecimiento nominal préstamos + MA12 */}
-      <ChartWrapper title="Crecimiento Interanual Nominal — Préstamos"
-        subtitle="% variación interanual y media móvil 12 meses"
+      <ChartWrapper title="Crecimiento Interanual — Préstamos al Sector Privado (MN)"
+        subtitle="Saldo total prest_tot (Sector Privado en Moneda Nacional, BCRD) · % YoY y MA12"
         from={rPrest[0]} to={rPrest[1]} isLoading={loading} onRangeChange={onRPrest}
         downloadName="prestamos-crecimiento">
         <LineChartSimple
@@ -131,13 +131,13 @@ export default function DepositosPrestamos() {
           data={vcData.map(d => ({ ...d, fecha: d.fecha.slice(0, 7) })).filter(d => d.fecha >= rDep[0] && d.fecha <= rDep[1])}
           color={C.purple} unit="MM RD$"
           yFormatter={v => `${(v/1000).toFixed(0)}B`}
-          xFormatter={v => { const [y,m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
+          xFormatter={xFmtMonth}
           label="Valores en circulación" />
       </ChartWrapper>
 
       {/* G1 Préstamos en ME — Monto y % del total (OSD) */}
-      <ChartWrapper title="Préstamos en Moneda Extranjera"
-        subtitle="MM US$ (eje izq.) y % del total de cartera (eje der.) — OSD"
+      <ChartWrapper title="Préstamos en Moneda Extranjera (OSD)"
+        subtitle="Monto en MM US$ (eje izq.) y % de la cartera total OSD (eje der.)"
         from={rDep[0]} to={rDep[1]} isLoading={loading} onRangeChange={onRDep}
         downloadName="prestamos-me">
         <ComboChartDual
@@ -164,7 +164,7 @@ export default function DepositosPrestamos() {
           lineKey="pct"   lineLabel="% del total de cartera" lineColor={C.red}
           yLeftFormatter={v => `${v.toFixed(0)}`}
           yRightFormatter={v => `${v?.toFixed(1) ?? '—'}%`}
-          xFormatter={v => { const [y,m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
+          xFormatter={xFmtMonth}
         />
       </ChartWrapper>
 
@@ -188,7 +188,7 @@ export default function DepositosPrestamos() {
             { key: 'ma12',  label: 'Media móvil 12m',    color: C.red, dashed: true, strokeWidth: 1.5 },
           ]}
           unit="MM RD$" yFormatter={v => `${(v/1000).toFixed(1)}B`}
-          xFormatter={v => { const [y,m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
+          xFormatter={xFmtMonth}
         />
       </ChartWrapper>
 
@@ -219,14 +219,14 @@ export default function DepositosPrestamos() {
             { key: 'pas', label: 'Pasivos', color: C.red,   dashed: true, strokeWidth: 1.5 },
           ]}
           unit="MM US$" yFormatter={v => `${v.toFixed(0)}`}
-          xFormatter={v => { const [y,m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
+          xFormatter={xFmtMonth}
           refLine={0}
         />
       </ChartWrapper>
 
       {/* G18 Préstamos por sector — % cartera */}
-      <ChartWrapper title="Composición de la Cartera de Préstamos por Sector"
-        subtitle="% del total de préstamos — Seleccionar sectores con filtro"
+      <ChartWrapper title="Composición Cartera Préstamos por Sector (Sector Privado, MN)"
+        subtitle="% del total de préstamos al sector privado en MN — Seleccionar sectores"
         from={rSec[0]} to={rSec[1]} isLoading={loading} onRangeChange={onRSec}
         downloadName="prestamos-por-sector" fullWidth>
         <div className="flex flex-wrap gap-2 mb-3">
@@ -256,10 +256,10 @@ export default function DepositosPrestamos() {
       </ChartWrapper>
 
       {/* G18b — Montos / YoY por sector */}
-      <ChartWrapper title="Préstamos por Sector — Montos"
+      <ChartWrapper title="Préstamos por Sector — Montos (Sector Privado, MN)"
         subtitle={montosView === 'nivel'
-          ? 'MM de RD$ — Seleccionar sectores arriba'
-          : 'Crecimiento interanual % — Seleccionar sectores arriba'}
+          ? 'Saldo en MM RD$ · Sector Privado en Moneda Nacional · Seleccionar sectores arriba'
+          : 'Crecimiento interanual % · Sector Privado en MN · Seleccionar sectores arriba'}
         from={rSec[0]} to={rSec[1]} onRangeChange={onRSec}
         isLoading={loading} downloadName={`prestamos-sectores-${montosView}`} fullWidth>
         <div className="flex items-center gap-2 mb-2 -mt-1">

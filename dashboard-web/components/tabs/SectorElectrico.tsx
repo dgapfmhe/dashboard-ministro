@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, filterMergedByRange, monthsAgo } from '@/lib/utils'
+import { merge, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import LineChartSimple from '@/components/charts/LineChartSimple'
@@ -64,11 +64,8 @@ function useRange(def: [string, string]) {
   return [r, (f: string, t: string) => setR([f, t])] as const
 }
 
-const xFmtM = (v: string) => {
-  if (!v || v.length < 7) return v
-  const [y, m] = v.split('-')
-  return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}`
-}
+// Alias para preservar referencias del archivo (xFmtMonth global del lib)
+const xFmtM = xFmtMonth
 const xFmtY = (v: string) => v.slice(0, 4)
 
 export default function SectorElectrico() {
@@ -231,9 +228,9 @@ export default function SectorElectrico() {
         />
       </ChartWrapper>
 
-      {/* G6 Cobranzas por distribuidora */}
+      {/* G6 Cobranzas por distribuidora — escala ajustada al rango efectivo */}
       <ChartWrapper title="Cobranzas por Distribuidora"
-        subtitle="% recaudo sobre facturado"
+        subtitle="% recaudo sobre facturado (escala enfocada para ver diferencias)"
         from={rCobr[0]} to={rCobr[1]} onRangeChange={onRCobr}
         isLoading={loading} downloadName="cobranzas-distribuidoras">
         <LineChartSimple
@@ -243,12 +240,13 @@ export default function SectorElectrico() {
           }))}
           unit="%" yFormatter={v => `${v.toFixed(1)}%`}
           xFormatter={xFmtM}
+          yDomain={[80, 110]}   // cobranzas típicas 85-105% → zoom para ver dispersión
         />
       </ChartWrapper>
 
-      {/* G7 Precios de venta */}
+      {/* G7 Precios de venta — escala ajustada */}
       <ChartWrapper title="Precio Medio de Venta de Energía"
-        subtitle="USCents/kWh por distribuidora"
+        subtitle="USCents/kWh por distribuidora (escala enfocada)"
         from={rPventa[0]} to={rPventa[1]} onRangeChange={onRPventa}
         isLoading={loading} downloadName="precio-venta-distribuidoras">
         <LineChartSimple
@@ -258,6 +256,7 @@ export default function SectorElectrico() {
           }))}
           unit="cUS$/kWh" yFormatter={v => v.toFixed(2)}
           xFormatter={xFmtM}
+          yDomain={[10, 22]}    // precios típicos 12-20 cUS$/kWh → enfoca diferencias
         />
       </ChartWrapper>
 

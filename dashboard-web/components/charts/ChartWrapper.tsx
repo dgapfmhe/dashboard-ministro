@@ -27,6 +27,15 @@ interface ChartWrapperProps {
   fullWidth?: boolean
   height?: number
   hideRange?: boolean
+  /** Última observación a mostrar como badge dentro del gráfico (esquina sup. der.).
+   * Si se da, aparece un card pequeño con label, valor y fecha. */
+  lastValue?: {
+    label?: string
+    value: number | null | undefined
+    fecha?: string
+    unit?: string
+    valueFormatter?: (v: number) => string
+  }
   children: React.ReactNode
 }
 
@@ -51,7 +60,7 @@ export default function ChartWrapper(props: ChartWrapperProps) {
     dataMin = '1990-01',
     onRangeChange, downloadName,
     isLoading = false, fullWidth = false, height = 320,
-    hideRange = false, children,
+    hideRange = false, lastValue, children,
   } = props
   const cardRef = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
@@ -185,7 +194,27 @@ export default function ChartWrapper(props: ChartWrapperProps) {
               <div className="w-8 h-8 border-2 border-[#1B3A5C] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <div className="w-full" style={{ height, minWidth: 0 }}>{children}</div>
+            <div className="relative w-full" style={{ height, minWidth: 0 }}>
+              {children}
+              {lastValue && lastValue.value != null && isFinite(lastValue.value) && (
+                <div className="absolute top-1 right-3 bg-white/95 border border-[#D1D9E0] rounded-md shadow-sm px-2 py-1 text-right pointer-events-none">
+                  {lastValue.label && (
+                    <div className="text-[9px] uppercase tracking-wider text-[#6B7280] font-medium">
+                      {lastValue.label}
+                    </div>
+                  )}
+                  <div className="text-[14px] font-bold text-[#1B3A5C] tabular-nums leading-tight">
+                    {lastValue.valueFormatter
+                      ? lastValue.valueFormatter(lastValue.value)
+                      : lastValue.value.toFixed(2)}
+                    {lastValue.unit && <span className="text-[10px] font-medium text-[#6B7280] ml-1">{lastValue.unit}</span>}
+                  </div>
+                  {lastValue.fecha && (
+                    <div className="text-[9px] text-[#9CA3AF] tabular-nums">{lastValue.fecha}</div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

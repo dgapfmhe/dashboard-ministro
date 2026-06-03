@@ -44,13 +44,14 @@ def serie_yahoo(ticker: str, variable_id: str,
 
 
 TICKERS_YAHOO: list[tuple[str, str]] = [
-    ("CL=F",  "petroleo_wti"),
-    ("NG=F",  "gas_natural"),
-    ("MTF=F", "carbon_aus"),
-    ("GC=F",  "oro"),
-    ("^GSPC", "sp500"),
-    ("^DJI",  "dow_jones"),
-    ("^VIX",  "vix"),
+    ("CL=F",     "petroleo_wti"),
+    ("NG=F",     "gas_natural"),
+    ("MTF=F",    "carbon_aus"),
+    ("GC=F",     "oro"),
+    ("^GSPC",    "sp500"),
+    ("^DJI",     "dow_jones"),
+    ("^VIX",     "vix"),
+    ("EURUSD=X", "eur_usd"),   # cruce EUR/USD para calcular DOP/EUR en frontend
 ]
 
 

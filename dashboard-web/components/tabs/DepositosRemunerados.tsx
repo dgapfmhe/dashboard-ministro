@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { movingAverage, monthsAgo, dailyYoYGrowth } from '@/lib/utils'
+import { movingAverage, monthsAgo, dailyYoYGrowth, xFmtMonth, xFmtDay as xFmtDayUtil } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import LineChartSimple from '@/components/charts/LineChartSimple'
 import BarChartVert from '@/components/charts/BarChartVert'
@@ -16,11 +16,7 @@ function useRange(def: [string, string]) {
   return [r, (f: string, t: string) => setR([f, t])] as const
 }
 
-const xFmtDay = (v: string) => {
-  if (!v || v.length < 7) return v
-  const [y, m, d] = v.split('-')
-  return `${d ?? '01'}/${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}/${y.slice(2)}`
-}
+const xFmtDay = xFmtDayUtil
 
 export default function DepositosRemunerados() {
   const [series, setSeries] = useState<SeriesMap>({})
@@ -204,7 +200,7 @@ export default function DepositosRemunerados() {
             data={filtRange(deprReal, r3)}
             series={[{ key: 'valor', label: 'Depósitos reales (RD$ deflactados)', color: C.teal, strokeWidth: 2 }]}
             unit="MM RD$" yFormatter={v => `${(v/1000).toFixed(1)}B`}
-            xFormatter={v => { const [y,m] = v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }}
+            xFormatter={xFmtMonth}
           />
         </ChartWrapper>
 

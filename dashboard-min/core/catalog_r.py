@@ -53,6 +53,7 @@ DIARIAS: list[dict] = [
     _v("sp500_d",         "S&P 500 (diario)",                       "Financiero","diaria", "índice",    "Yahoo"),
     _v("dow_jones_d",     "Dow Jones (diario)",                     "Financiero","diaria", "índice",    "Yahoo"),
     _v("vix_d",           "VIX (diario)",                            "Financiero","diaria", "índice",    "Yahoo"),
+    _v("eur_usd",         "EUR/USD cruce (diario)",                  "Mercado Cambiario", "diaria", "USD/EUR", "Yahoo"),
     _v("dgs10_d",         "Tasa Tesoro EE.UU. 10 años (DGS10)",     "Financiero","diaria", "%",          "FRED"),
     # Depósitos remunerados de corto plazo (diaria, operaciones_monetarias.xlsx)
     _v("deprem_cp",       "Depósitos Remunerados de Corto Plazo (Ventanilla Directa)",

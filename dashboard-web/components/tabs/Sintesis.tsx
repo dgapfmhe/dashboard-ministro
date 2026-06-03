@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { yoyGrowth, dailyYoYGrowth, monthsAgo } from '@/lib/utils'
+import { yoyGrowth, dailyYoYGrowth, monthsAgo, xFmtMonth } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import LineChartSimple from '@/components/charts/LineChartSimple'
 import ComboChartDual from '@/components/charts/ComboChartDual'
@@ -28,11 +28,7 @@ function useRange(def: [string, string]) {
   return [r, (f: string, t: string) => setR([f, t])] as const
 }
 
-const xFmtM = (v: string) => {
-  if (!v || v.length < 7) return v
-  const [y, m] = v.split('-')
-  return `${['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][+m - 1]}'${y.slice(2)}`
-}
+const xFmtM = xFmtMonth
 
 const META_INFLACION = 4
 const META_BANDA = 1   // ±1 pp
@@ -177,7 +173,11 @@ export default function Sintesis() {
       <ChartWrapper title="IMAE — Crecimiento Interanual"
         subtitle="Índice Mensual de Actividad Económica (% YoY)"
         from={r1[0]} to={r1[1]} isLoading={loading} onRangeChange={onR1}
-        downloadName="imae-crecimiento">
+        downloadName="imae-crecimiento"
+        lastValue={(() => {
+          const last = imaeYoY[imaeYoY.length - 1]
+          return last ? { label: 'Último', value: last.valor, fecha: xFmtM(last.fecha), unit: '%' } : undefined
+        })()}>
         <LineChartSimple
           data={filtRange(imaeYoY, r1)}
           series={[{ key: 'valor', label: 'IMAE crecimiento %', color: C.blue, strokeWidth: 2.5 }]}
@@ -191,7 +191,13 @@ export default function Sintesis() {
       <ChartWrapper title="Inflación — General, Subyacente y Meta BCRD"
         subtitle={`Meta BCRD ${META_INFLACION}% ± ${META_BANDA}pp (bandas punteadas)`}
         from={r1[0]} to={r1[1]} isLoading={loading} onRangeChange={onR1}
-        downloadName="inflacion-meta">
+        downloadName="inflacion-meta"
+        lastValue={(() => {
+          const last = inflacionData[inflacionData.length - 1]
+          return last && last.general != null
+            ? { label: 'IPC Gen.', value: last.general, fecha: xFmtM(last.fecha), unit: '%' }
+            : undefined
+        })()}>
         <LineChartSimple
           data={filtRange(inflacionData, r1)}
           series={[
@@ -211,7 +217,13 @@ export default function Sintesis() {
       <ChartWrapper title="Corredor de Tasas de Interés"
         subtitle="TPM (política monetaria), Activa y Pasiva promedio ponderado"
         from={r2[0]} to={r2[1]} isLoading={loading} onRangeChange={onR2}
-        downloadName="corredor-tasas">
+        downloadName="corredor-tasas"
+        lastValue={(() => {
+          const lastWithTpm = [...corredorData].reverse().find(d => d.tpm != null)
+          return lastWithTpm
+            ? { label: 'TPM', value: lastWithTpm.tpm as number, fecha: xFmtM(lastWithTpm.fecha), unit: '%' }
+            : undefined
+        })()}>
         <LineChartSimple
           data={filtRange(corredorData, r2)}
           series={[
@@ -252,7 +264,13 @@ export default function Sintesis() {
       <ChartWrapper title="Cuenta Corriente — Nivel y % del PIB"
         subtitle="Saldo trimestral (MM US$, barras) y % del PIB anualizado (línea, eje der.)"
         from={r5[0]} to={r5[1]} isLoading={loading} onRangeChange={onR5}
-        downloadName="cuenta-corriente" fullWidth>
+        downloadName="cuenta-corriente" fullWidth
+        lastValue={(() => {
+          const last = ccData[ccData.length - 1]
+          return last
+            ? { label: 'Saldo', value: last.nivel, fecha: xFmtM(last.fecha), unit: 'M US$' }
+            : undefined
+        })()}>
         <ComboChartDual
           data={filtRange(ccData, r5) as unknown as Record<string, string | number>[]}
           barKey="nivel"   barLabel="Cuenta Corriente (MM US$)" barColor={C.blue}

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, yoyGrowth, filterMergedByRange, monthsAgo } from '@/lib/utils'
+import { merge, yoyGrowth, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import LineChartSimple from '@/components/charts/LineChartSimple'
 import type { SeriesMap } from '@/types'
@@ -129,7 +129,7 @@ export default function Tasas() {
     return keys.map(k => ({ fecha: k, tpm: tpmMap[k] ?? null, taylor1: t1Map[k] ?? null, taylor2: t2Map[k] ?? null }))
   }, [series.tpm, taylorLine1, taylorLine2])
 
-  const xFmt = (v: string) => { const [y,m]=v.split('-'); return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}` }
+  const xFmt = xFmtMonth
   const pctFmt = (v: number) => `${v?.toFixed(2)}%`
 
   return (
@@ -169,24 +169,6 @@ export default function Tasas() {
             { key: 'ipcSub',     label: 'Inflación Subyacente', color: C.red, dashed: true },
           ]}
           unit="%" yFormatter={pctFmt} xFormatter={xFmt} refLine={0}
-        />
-      </ChartWrapper>
-
-      {/* G3a Gap TPM real vs subyacente */}
-      <ChartWrapper title="Gap: TPM Real − Inflación Subyacente"
-        subtitle="Diferencia en puntos porcentuales"
-        from={r3[0]} to={r3[1]} isLoading={loading} onRangeChange={onR3}
-        downloadName="gap-tpm-real-sub">
-        <LineChartSimple
-          data={(() => {
-            const subMap: Record<string, number> = {}
-            for (const d of ipcSubYoY) subMap[d.fecha.slice(0, 7)] = d.valor
-            return tpmRealSub.filter(d => d.fecha >= r3[0] && d.fecha <= r3[1]).map(d => ({
-              fecha: d.fecha, gap: Math.round((d.valor - (subMap[d.fecha] ?? 0)) * 100) / 100,
-            }))
-          })()}
-          series={[{ key: 'gap', label: 'Gap TPM Real − Subyacente', color: C.blue }]}
-          unit="pp" yFormatter={pctFmt} xFormatter={xFmt} refLine={0}
         />
       </ChartWrapper>
 

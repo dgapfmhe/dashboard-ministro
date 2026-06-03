@@ -150,6 +150,30 @@ export function filterMergedByRange(data: MergedPoint[], from: string, to: strin
   })
 }
 
+/* ─── Formatos de fecha estandarizados ────────────────────────────────
+ * Convención del dashboard: "Ene 25" (3 letras + año 2 dígitos).
+ * Acepta YYYY-MM o YYYY-MM-DD. Si es diario, opcionalmente puede mostrar
+ * el día con `xFmtDay()`.
+ */
+const _MESES_3L = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+export function xFmtMonth(v: string): string {
+  if (!v || v.length < 7) return v
+  const [y, m] = v.split('-')
+  const idx = parseInt(m, 10) - 1
+  if (idx < 0 || idx > 11) return v
+  return `${_MESES_3L[idx]} ${y.slice(2)}`
+}
+export function xFmtDay(v: string): string {
+  if (!v || v.length < 10) return xFmtMonth(v)
+  const [y, m, d] = v.split('-')
+  const idx = parseInt(m, 10) - 1
+  if (idx < 0 || idx > 11) return v
+  return `${parseInt(d, 10)} ${_MESES_3L[idx]} ${y.slice(2)}`
+}
+export function xFmtYear(v: string): string {
+  return v?.slice(0, 4) ?? v
+}
+
 export function fmtMillones(v: number): string {
   if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}B`
   return `${v.toFixed(0)}M`

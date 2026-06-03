@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries, fetchWorldBankGDP } from '@/lib/queries'
-import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q } from '@/lib/utils'
+import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q, xFmtMonth } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import BarChartHoriz, { HBarSeries } from '@/components/charts/BarChartHoriz'
@@ -168,11 +168,7 @@ export default function SectorExterno() {
   const [rTur, onRTur] = useRange(defMes)                    // Turistas MENSUAL
   const filtA = (arr: { fecha: string; valor: number }[], r: [string, string]) =>
     arr.filter(d => d.fecha.slice(0, 7) >= r[0] && d.fecha.slice(0, 7) <= r[1])
-  const xFmtMon = (v: string) => {
-    if (!v || v.length < 7) return v
-    const [y, m] = v.split('-')
-    return `${['E','F','M','A','M','J','J','A','S','O','N','D'][+m-1]}'${y.slice(2)}`
-  }
+  const xFmtMon = xFmtMonth
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,7 +269,7 @@ export default function SectorExterno() {
           lineKey="pct" lineLabel="% del PIB" lineColor={C.red}
           yLeftFormatter={(v) => `${v.toFixed(0)}M`}
           yRightFormatter={(v) => `${v.toFixed(1)}%`}
-          xFormatter={(v) => { const [y, m] = v.split('-'); const mn=['E','F','M','A','M','J','J','A','S','O','N','D']; return `${mn[+m-1]}'${y.slice(2)}` }}
+          xFormatter={xFmtMonth}
         />
       </ChartWrapper>
 

@@ -23,6 +23,10 @@ interface Props {
   refLine?: number
   showLegend?: boolean
   dot?: boolean
+  /** Dominio del eje Y. ['auto', 'auto'] usa el rango de los datos.
+   * ['dataMin - X', 'dataMax + Y'] ajusta con padding. Útil para
+   * ampliar visualmente diferencias pequeñas entre series. */
+  yDomain?: [number | string, number | string]
 }
 
 const defaultYFmt = (v: number) => `${v.toFixed(1)}`
@@ -55,6 +59,7 @@ const CustomTooltip = ({ active, payload, label, unit, yFmt }: {
 export default function LineChartSimple({
   data, series, xKey = 'fecha', unit, yFormatter = defaultYFmt,
   xFormatter = defaultXFmt, refLine, showLegend = true, dot = false,
+  yDomain,
 }: Props) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -74,6 +79,7 @@ export default function LineChartSimple({
           axisLine={false}
           tickLine={false}
           width={52}
+          domain={yDomain ?? ['auto', 'auto']}
         />
         <Tooltip content={<CustomTooltip unit={unit} yFmt={yFormatter} />} />
         {showLegend && (
