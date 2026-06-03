@@ -283,7 +283,16 @@ def parser_pivot_anio_x_mes(
             iv = int(float(v))
             return iv if 1990 <= iv <= 2100 else None
         except (TypeError, ValueError):
-            return None
+            pass
+        # Acepta strings con sufijo preliminar como '2024*', '2024 (p)', '2024(p)'
+        if isinstance(v, str):
+            import re
+            m = re.match(r"^\s*(\d{4})", v)
+            if m:
+                yr = int(m.group(1))
+                if 1990 <= yr <= 2100:
+                    return yr
+        return None
 
     # 1. Localiza la fila de años: la primera con ≥ 2 celdas que sean años.
     header_row = None
@@ -360,7 +369,16 @@ def parser_tpm(path: Path) -> pd.DataFrame:
             iv = int(float(v))
             return iv if 1990 <= iv <= 2100 else None
         except (TypeError, ValueError):
-            return None
+            pass
+        # Acepta strings con sufijo preliminar como '2024*', '2024 (p)', '2024(p)'
+        if isinstance(v, str):
+            import re
+            m = re.match(r"^\s*(\d{4})", v)
+            if m:
+                yr = int(m.group(1))
+                if 1990 <= yr <= 2100:
+                    return yr
+        return None
 
     start_row = None
     for i in range(min(30, len(raw))):

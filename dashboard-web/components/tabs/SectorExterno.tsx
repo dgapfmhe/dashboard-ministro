@@ -115,33 +115,116 @@ export default function SectorExterno() {
     return Object.values(byMonth).sort((a, b) => a.fecha.localeCompare(b.fecha))
   }, [series.embi_rd, series.embi_latam, series.embi_global])
 
-  /* Horizontal bar: last 2 years comparison — TODO en USD para consistencia
-   * con G1. Usa exportAnualUSD (ya convertido) en vez de exp_nom raw RD$. */
-  const hbarData = useMemo(() => {
-    const last2Annual = (annual: { fecha: string; valor: number }[]) => ({
-      y1: annual[annual.length - 2]?.valor ?? 0,
-      y2: annual[annual.length - 1]?.valor ?? 0,
-    })
-    const exp = last2Annual(exportAnualUSD)  // ya en MM US$
-    const rem = last2Annual(aggregateAnnual(series.rem_fam ?? [], 'sum'))
-    const rin = (() => {
-      const r = aggregateAnnual(series.rin ?? [], 'last')
-      return { y1: r[r.length - 2]?.valor ?? 0, y2: r[r.length - 1]?.valor ?? 0 }
-    })()
-    const yr1 = exportAnualUSD[exportAnualUSD.length - 2]?.fecha?.slice(0, 4) ?? 'Año-1'
-    const yr2 = exportAnualUSD[exportAnualUSD.length - 1]?.fecha?.slice(0, 4) ?? 'Año'
-    return [
-      { nombre: 'Exportaciones', [yr1]: exp.y1, [yr2]: exp.y2 },
-      { nombre: 'Remesas',       [yr1]: rem.y1, [yr2]: rem.y2 },
-      { nombre: 'RIN',           [yr1]: rin.y1, [yr2]: rin.y2 },
-    ]
-  }, [exportAnualUSD, series.rem_fam, series.rin])
+  /* Comparativa Indicadores Externos: 3 columnas
+   *   - Año-2 (completo: ej 2024)
+   *   - Año-1 (completo: ej 2025)
+   *   - Año vigente (parcial: ej 2026 hasta Q1/Q2/Q3 disponible)
+   * Para el año parcial se indica hasta qué mes/trimestre hay datos.
+   * - Exportaciones (trimestral): suma de los Q acumulados
+   * - Remesas (mensual): suma de meses acumulados
+   * - RIN (mensual stock): último valor disponible */
+  const hbarComp = useMemo(() => {
+    const cy = new Date().getFullYear()
+    const yrPrev2 = String(cy - 2)
+    const yrPrev1 = String(cy - 1)
+    const yrCurr  = String(cy)
 
-  const yr1 = exportAnual[exportAnual.length - 2]?.fecha?.slice(0, 4) ?? 'Año-1'
-  const yr2 = exportAnual[exportAnual.length - 1]?.fecha?.slice(0, 4) ?? 'Año'
+    const sumByYear = (arr: DataPoint[] | undefined): Record<string, { suma: number; n: number; ultMes: number }> => {
+      if (!arr) return {}
+      const m: Record<string, { suma: number; n: number; ultMes: number }> = {}
+      for (const d of arr) {
+        if (!isFinite(d.valor)) continue
+        const y = d.fecha.slice(0, 4)
+        const mn = parseInt(d.fecha.slice(5, 7), 10)
+        if (!m[y]) m[y] = { suma: 0, n: 0, ultMes: 0 }
+        m[y].suma += d.valor
+        m[y].n += 1
+        if (mn > m[y].ultMes) m[y].ultMes = mn
+      }
+      return m
+    }
+    const lastByYear = (arr: DataPoint[] | undefined): Record<string, { valor: number; ultMes: number }> => {
+      if (!arr) return {}
+      const m: Record<string, { valor: number; fecha: string; ultMes: number }> = {}
+      const sorted = [...arr].sort((a, b) => a.fecha.localeCompare(b.fecha))
+      for (const d of sorted) {
+        if (!isFinite(d.valor)) continue
+        const y = d.fecha.slice(0, 4)
+        const mn = parseInt(d.fecha.slice(5, 7), 10)
+        if (!m[y] || d.fecha > m[y].fecha) {
+          m[y] = { valor: d.valor, fecha: d.fecha, ultMes: mn }
+        }
+      }
+      return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { valor: v.valor, ultMes: v.ultMes }]))
+    }
+
+    // exp_nom es trimestral en RD$ → exportAnualUSD ya tiene el sum en USD por año
+    const expByYear: Record<string, { suma: number; ultMes: number }> = {}
+    for (const d of exportAnualUSD) {
+      expByYear[d.fecha.slice(0, 4)] = { suma: d.valor, ultMes: 12 }
+    }
+    // Para 2026 (parcial), recalculamos solo con los Q disponibles
+    const expRaw = series.exp_nom ?? []
+    const tcnMap: Record<string, number[]> = {}
+    for (const d of series.tcn_venta_m ?? []) {
+      const y = d.fecha.slice(0, 4)
+      if (isFinite(d.valor)) (tcnMap[y] ??= []).push(d.valor)
+    }
+    const expCurr: { suma: number; ultMes: number } = { suma: 0, ultMes: 0 }
+    for (const d of expRaw) {
+      if (!isFinite(d.valor)) continue
+      const y = d.fecha.slice(0, 4)
+      if (y !== yrCurr) continue
+      const tcns = tcnMap[y]
+      const tcn = tcns && tcns.length ? tcns.reduce((s, x) => s + x, 0) / tcns.length : null
+      if (tcn) {
+        expCurr.suma += d.valor / tcn
+        const mn = parseInt(d.fecha.slice(5, 7), 10)
+        if (mn > expCurr.ultMes) expCurr.ultMes = mn
+      }
+    }
+    if (expCurr.suma > 0) expByYear[yrCurr] = expCurr
+
+    const remByYear = sumByYear(series.rem_fam)
+    const rinByYear = lastByYear(series.rin)
+    const ultMesToLabel = (mes: number, sumOrStock: 'sum' | 'stock'): string => {
+      if (mes >= 12) return ''
+      if (sumOrStock === 'stock') return `hasta ${['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov'][mes] ?? ''}`
+      const q = Math.ceil(mes / 3)
+      return `Acum. Q${q} (${mes}m)`
+    }
+
+    const rows: Array<Record<string, string | number>> = [
+      {
+        nombre: 'Exportaciones (US$M)',
+        [yrPrev2]: expByYear[yrPrev2]?.suma ?? 0,
+        [yrPrev1]: expByYear[yrPrev1]?.suma ?? 0,
+        [yrCurr]:  expByYear[yrCurr]?.suma ?? 0,
+        _nota_curr: expByYear[yrCurr] ? ultMesToLabel(expByYear[yrCurr]!.ultMes, 'sum') : '',
+      },
+      {
+        nombre: 'Remesas (US$M)',
+        [yrPrev2]: remByYear[yrPrev2]?.suma ?? 0,
+        [yrPrev1]: remByYear[yrPrev1]?.suma ?? 0,
+        [yrCurr]:  remByYear[yrCurr]?.suma ?? 0,
+        _nota_curr: remByYear[yrCurr] ? ultMesToLabel(remByYear[yrCurr]!.ultMes, 'sum') : '',
+      },
+      {
+        nombre: 'RIN (US$M, stock fin año)',
+        [yrPrev2]: rinByYear[yrPrev2]?.valor ?? 0,
+        [yrPrev1]: rinByYear[yrPrev1]?.valor ?? 0,
+        [yrCurr]:  rinByYear[yrCurr]?.valor ?? 0,
+        _nota_curr: rinByYear[yrCurr] ? ultMesToLabel(rinByYear[yrCurr]!.ultMes, 'stock') : '',
+      },
+    ]
+    return { rows, yrPrev2, yrPrev1, yrCurr }
+  }, [exportAnualUSD, series.exp_nom, series.tcn_venta_m, series.rem_fam, series.rin])
+
+  const hbarData = hbarComp.rows
   const hbarSeries: HBarSeries[] = [
-    { key: yr1, label: yr1, color: C.blue },
-    { key: yr2, label: yr2, color: C.lightBlue },
+    { key: hbarComp.yrPrev2, label: hbarComp.yrPrev2, color: C.gray },
+    { key: hbarComp.yrPrev1, label: hbarComp.yrPrev1, color: C.blue },
+    { key: hbarComp.yrCurr,  label: hbarComp.yrCurr,  color: C.lightBlue },
   ]
 
   /* RIN dual-axis data. Excluyo entradas con RIN no-finito o sin %PIB
@@ -232,12 +315,24 @@ export default function SectorExterno() {
           label="Llegada turistas" />
       </ChartWrapper>
 
-      {/* G6 Indicadores externos comparativos */}
-      <ChartWrapper title="Indicadores Externos — Comparación Últimos 2 Años"
-        subtitle="MM de US$ — Exportaciones, Remesas, RIN"
+      {/* G6 Indicadores externos comparativos — 3 años con vigente parcial */}
+      <ChartWrapper
+        title={`Indicadores Externos — ${hbarComp.yrPrev2} · ${hbarComp.yrPrev1} · ${hbarComp.yrCurr} (parcial)`}
+        subtitle={(() => {
+          const nota = hbarData.map(r => r._nota_curr).find(n => typeof n === 'string' && n.length > 0)
+          return nota
+            ? `MM US$ — Exportaciones, Remesas (sumas anuales), RIN (stock) · ${hbarComp.yrCurr}: ${nota}`
+            : 'MM US$ — Exportaciones, Remesas (sumas anuales), RIN (stock)'
+        })()}
         hideRange isLoading={loading} downloadName="indicadores-externos-comparacion">
-        <BarChartHoriz data={hbarData} series={hbarSeries} unit="MM US$"
-          formatter={(v) => `${(v / 1000).toFixed(1)}B`} />
+        <BarChartHoriz
+          data={hbarData.map(r => {
+            const { _nota_curr, ...rest } = r as Record<string, string | number>
+            void _nota_curr
+            return rest
+          })}
+          series={hbarSeries} unit="MM US$"
+          formatter={(v) => `${(v / 1000).toFixed(2)}B`} />
       </ChartWrapper>
 
       {/* G7 PIB por países */}
