@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
+import { merge, filterMergedByRange, monthsAgo, xFmtMonth, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import LineChartSimple from '@/components/charts/LineChartSimple'
@@ -155,7 +155,9 @@ export default function SectorElectrico() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
       {/* G1 Generación total */}
-      <ChartWrapper title="Generación Total de Energía"
+      <ChartWrapper
+        lastValue={(() => { const l = ultimaObs(series.el_gen_total); return l ? { label: 'Gen Total', value: l.valor, fecha: xFmtM(l.fecha.slice(0,7)), unit: 'GWh' } : undefined })()}
+        title="Generación Total de Energía"
         subtitle="GWh mensuales — MEM"
         from={rGen[0]} to={rGen[1]} onRangeChange={onRGen}
         isLoading={loading} downloadName="generacion-total">

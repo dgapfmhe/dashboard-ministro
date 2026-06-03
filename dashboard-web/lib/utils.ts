@@ -150,6 +150,19 @@ export function filterMergedByRange(data: MergedPoint[], from: string, to: strin
   })
 }
 
+/* ─── Helper para badge de último valor en charts ─────────────────── */
+/** Retorna el último punto válido (finito) de una serie ordenada ASC.
+ *  Útil para alimentar la prop `lastValue` de ChartWrapper. */
+export function ultimaObs<T extends { fecha: string; valor: number }>(
+  arr: T[] | undefined,
+): T | null {
+  if (!arr || arr.length === 0) return null
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].valor != null && isFinite(arr[i].valor)) return arr[i]
+  }
+  return null
+}
+
 /* ─── Formatos de fecha estandarizados ────────────────────────────────
  * Convención del dashboard: "Ene 25" (3 letras + año 2 dígitos).
  * Acepta YYYY-MM o YYYY-MM-DD. Si es diario, opcionalmente puede mostrar

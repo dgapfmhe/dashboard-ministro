@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, movingAverage, yoyGrowth, filterByRange, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
+import { merge, movingAverage, yoyGrowth, filterByRange, filterMergedByRange, monthsAgo, xFmtMonth, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import LineChartSimple from '@/components/charts/LineChartSimple'
@@ -93,7 +93,9 @@ export default function DepositosPrestamos() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
       {/* G2 BMR y crecimiento */}
-      <ChartWrapper title="Base Monetaria y Crecimiento Interanual"
+      <ChartWrapper
+        lastValue={(() => { const l = ultimaObs(series.bmr_rd); return l ? { label: 'BMR', value: l.valor, fecha: xFmtMonth(l.fecha.slice(0,7)), unit: 'MM RD$', valueFormatter: v => `${(v/1000).toFixed(1)}B` } : undefined })()}
+        title="Base Monetaria y Crecimiento Interanual"
         subtitle="BMR en MM de RD$ (barras) y variación % interanual (línea)"
         from={rBmr[0]} to={rBmr[1]} isLoading={loading} onRangeChange={onRBmr}
         downloadName="base-monetaria" note={NOTE_BMA}>
@@ -108,7 +110,9 @@ export default function DepositosPrestamos() {
       </ChartWrapper>
 
       {/* G6 Crecimiento nominal préstamos + MA12 */}
-      <ChartWrapper title="Crecimiento Interanual — Préstamos al Sector Privado (MN)"
+      <ChartWrapper
+        lastValue={(() => { const l = ultimaObs(series.prest_tot); return l ? { label: 'Prest. Total', value: l.valor, fecha: xFmtMonth(l.fecha.slice(0,7)), unit: 'MM RD$', valueFormatter: v => `${(v/1000).toFixed(1)}B` } : undefined })()}
+        title="Crecimiento Interanual — Préstamos al Sector Privado (MN)"
         subtitle="Saldo total prest_tot (Sector Privado en Moneda Nacional, BCRD) · % YoY y MA12"
         from={rPrest[0]} to={rPrest[1]} isLoading={loading} onRangeChange={onRPrest}
         downloadName="prestamos-crecimiento">
@@ -136,7 +140,9 @@ export default function DepositosPrestamos() {
       </ChartWrapper>
 
       {/* G1 Préstamos en ME — Monto y % del total (OSD) */}
-      <ChartWrapper title="Préstamos en Moneda Extranjera (OSD)"
+      <ChartWrapper
+        lastValue={(() => { const l = ultimaObs(series.prest_me_usd_osd); return l ? { label: 'Prest. ME', value: l.valor, fecha: xFmtMonth(l.fecha.slice(0,7)), unit: 'MM US$' } : undefined })()}
+        title="Préstamos en Moneda Extranjera (OSD)"
         subtitle="Monto en MM US$ (eje izq.) y % de la cartera total OSD (eje der.)"
         from={rDep[0]} to={rDep[1]} isLoading={loading} onRangeChange={onRDep}
         downloadName="prestamos-me">
@@ -169,7 +175,9 @@ export default function DepositosPrestamos() {
       </ChartWrapper>
 
       {/* G5 Depósitos del Gobierno en Sistema Financiero (OSD) */}
-      <ChartWrapper title="Depósitos del Gobierno en el Sistema Financiero"
+      <ChartWrapper
+        lastValue={(() => { const l = ultimaObs(series.dep_sp_osd); return l ? { label: 'Dep. Gob.', value: l.valor, fecha: xFmtMonth(l.fecha.slice(0,7)), unit: 'MM RD$', valueFormatter: v => `${(v/1000).toFixed(1)}B` } : undefined })()}
+        title="Depósitos del Gobierno en el Sistema Financiero"
         subtitle="MM de RD$ y media móvil 12 meses — OSD (Sector Público)"
         from={rDep[0]} to={rDep[1]} isLoading={loading} onRangeChange={onRDep}
         downloadName="dep-gobierno-osd">

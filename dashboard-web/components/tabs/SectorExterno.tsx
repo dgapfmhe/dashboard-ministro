@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries, fetchWorldBankGDP } from '@/lib/queries'
-import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q, xFmtMonth } from '@/lib/utils'
+import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q, xFmtMonth, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import BarChartHoriz, { HBarSeries } from '@/components/charts/BarChartHoriz'
@@ -259,7 +259,8 @@ export default function SectorExterno() {
       {/* G1 Exportaciones */}
       <ChartWrapper title="Exportaciones Totales" subtitle="MM de US$, acumulado anual"
         from={rExp[0]} to={rExp[1]} onRangeChange={onRExp}
-        isLoading={loading} downloadName="exportaciones-totales">
+        isLoading={loading} downloadName="exportaciones-totales"
+        lastValue={(() => { const l = ultimaObs(exportAnual); return l ? { label: 'Último año', value: l.valor, fecha: l.fecha.slice(0,4), unit: 'MM US$', valueFormatter: v => `${(v/1000).toFixed(2)}B` } : undefined })()}>
         <BarChartVert data={filtA(exportAnual, rExp)} color={C.blue} unit="MM US$"
           yFormatter={(v) => `${(v / 1000).toFixed(1)}B`} xFormatter={(v) => v.slice(0, 4)} />
       </ChartWrapper>
@@ -267,7 +268,8 @@ export default function SectorExterno() {
       {/* G2 Remesas — MENSUAL */}
       <ChartWrapper title="Remesas Familiares" subtitle="MM de US$ — mensual (BCRD)"
         from={rRem[0]} to={rRem[1]} onRangeChange={onRRem}
-        isLoading={loading} downloadName="remesas-mensual">
+        isLoading={loading} downloadName="remesas-mensual"
+        lastValue={(() => { const l = ultimaObs(remMensual); return l ? { label: 'Último', value: l.valor, fecha: xFmtMon(l.fecha), unit: 'MM US$' } : undefined })()}>
         <BarChartVert data={filtA(remMensual, rRem)} color={C.lightBlue} unit="MM US$"
           yFormatter={(v) => `${v.toFixed(0)}`} xFormatter={xFmtMon}
           label="Remesas familiares" />
@@ -277,7 +279,8 @@ export default function SectorExterno() {
       <ChartWrapper title="Inversión Extranjera Directa (IED)"
         subtitle="MM de US$ — Cuenta Financiera BoP (trimestral, BCRD)"
         from={rRem[0]} to={rRem[1]} onRangeChange={onRRem}
-        isLoading={loading} downloadName="ied-bp">
+        isLoading={loading} downloadName="ied-bp"
+        lastValue={(() => { const l = ultimaObs(series.ied_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtMon(l.fecha), unit: 'MM US$' } : undefined })()}>
         <BarChartVert
           data={(series.ied_bp ?? [])
             .filter(d => isFinite(d.valor) && d.fecha.slice(0,7) >= rRem[0] && d.fecha.slice(0,7) <= rRem[1])
@@ -292,7 +295,8 @@ export default function SectorExterno() {
       <ChartWrapper title="Ingresos por Turismo"
         subtitle="MM de US$ — Viajes (BoP, trimestral, BCRD)"
         from={rTur[0]} to={rTur[1]} onRangeChange={onRTur}
-        isLoading={loading} downloadName="ingresos-turismo-bp">
+        isLoading={loading} downloadName="ingresos-turismo-bp"
+        lastValue={(() => { const l = ultimaObs(series.viajes_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtMon(l.fecha), unit: 'MM US$' } : undefined })()}>
         <BarChartVert
           data={(series.viajes_bp ?? [])
             .filter(d => isFinite(d.valor) && d.fecha.slice(0,7) >= rTur[0] && d.fecha.slice(0,7) <= rTur[1])
@@ -306,7 +310,8 @@ export default function SectorExterno() {
       {/* G5 Llegada No Residentes — MENSUAL */}
       <ChartWrapper title="Llegada de No Residentes" subtitle="Personas — mensual (BCRD)"
         from={rTur[0]} to={rTur[1]} onRangeChange={onRTur}
-        isLoading={loading} downloadName="llegada-turistas-mensual">
+        isLoading={loading} downloadName="llegada-turistas-mensual"
+        lastValue={(() => { const l = ultimaObs(turMensual); return l ? { label: 'Último', value: l.valor / 1000, fecha: xFmtMon(l.fecha), unit: 'k personas', valueFormatter: v => v.toFixed(0) } : undefined })()}>
         <BarChartVert
           data={filtA(turMensual, rTur).map(d => ({ ...d, valor: d.valor / 1000 }))}
           color={C.teal} unit="miles personas"
@@ -315,25 +320,52 @@ export default function SectorExterno() {
           label="Llegada turistas" />
       </ChartWrapper>
 
-      {/* G6 Indicadores externos comparativos — 3 años con vigente parcial */}
-      <ChartWrapper
-        title={`Indicadores Externos — ${hbarComp.yrPrev2} · ${hbarComp.yrPrev1} · ${hbarComp.yrCurr} (parcial)`}
-        subtitle={(() => {
-          const nota = hbarData.map(r => r._nota_curr).find(n => typeof n === 'string' && n.length > 0)
-          return nota
-            ? `MM US$ — Exportaciones, Remesas (sumas anuales), RIN (stock) · ${hbarComp.yrCurr}: ${nota}`
-            : 'MM US$ — Exportaciones, Remesas (sumas anuales), RIN (stock)'
-        })()}
-        hideRange isLoading={loading} downloadName="indicadores-externos-comparacion">
-        <BarChartHoriz
-          data={hbarData.map(r => {
-            const { _nota_curr, ...rest } = r as Record<string, string | number>
-            void _nota_curr
-            return rest
-          })}
-          series={hbarSeries} unit="MM US$"
-          formatter={(v) => `${(v / 1000).toFixed(2)}B`} />
-      </ChartWrapper>
+      {/* G6 Indicadores externos comparativos — TABLA limpia 3 años */}
+      <div className="bg-white rounded-xl border border-[#D1D9E0] shadow-sm p-4 flex flex-col">
+        <h3 className="text-[13px] font-semibold text-[#1A202C]">
+          Indicadores Externos — {hbarComp.yrPrev2} · {hbarComp.yrPrev1} · {hbarComp.yrCurr} (parcial)
+        </h3>
+        <p className="text-[10px] text-[#6B7280] mb-3">
+          Sumas anuales para flujos (Exportaciones, Remesas) y stock al cierre para RIN.
+          El año vigente muestra hasta los datos disponibles (parcial).
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="bg-[#F0F2F5] text-[#1A202C]">
+                <th className="px-3 py-2 text-left font-semibold">Indicador</th>
+                <th className="px-3 py-2 text-right font-semibold">{hbarComp.yrPrev2}</th>
+                <th className="px-3 py-2 text-right font-semibold">{hbarComp.yrPrev1}</th>
+                <th className="px-3 py-2 text-right font-semibold">{hbarComp.yrCurr} <span className="font-normal text-[#6B7280]">(parcial)</span></th>
+                <th className="px-3 py-2 text-right font-semibold">Cobertura {hbarComp.yrCurr}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hbarData.map((r, i) => {
+                const nombre = r.nombre as string
+                const v_prev2 = r[hbarComp.yrPrev2] as number
+                const v_prev1 = r[hbarComp.yrPrev1] as number
+                const v_curr  = r[hbarComp.yrCurr]  as number
+                const nota = r._nota_curr as string
+                const fmtB = (v: number) => v >= 1000 ? `${(v/1000).toFixed(2)} B` : `${v.toFixed(0)} M`
+                return (
+                  <tr key={i} className="border-t border-[#F0F2F5]">
+                    <td className="px-3 py-2 text-[#1A202C] font-medium">{nombre}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtB(v_prev2)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmtB(v_prev1)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[#1B3A5C] font-semibold">{fmtB(v_curr)}</td>
+                    <td className="px-3 py-2 text-right text-[10px] text-[#6B7280] italic">{nota || '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[10px] text-[#9CA3AF] italic mt-3">
+          Exportaciones: trimestral exp_nom (BCRD) convertido a USD via TCN venta promedio del año ·
+          Remesas: rem_fam (BCRD, mensual) · RIN: rin último valor del año (stock)
+        </p>
+      </div>
 
       {/* G7 PIB por países */}
       <ChartWrapper title="Crecimiento del PIB por País / Región"

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, yoyGrowth, filterMergedByRange, monthsAgo, xFmtMonth } from '@/lib/utils'
+import { merge, yoyGrowth, filterMergedByRange, monthsAgo, xFmtMonth, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import LineChartSimple from '@/components/charts/LineChartSimple'
 import type { SeriesMap } from '@/types'
@@ -139,7 +139,8 @@ export default function Tasas() {
       <ChartWrapper title="Corredor de Tasas de Interés"
         subtitle="TPM, Tasa Activa y Tasa Pasiva — Promedio ponderado"
         from={r1[0]} to={r1[1]} isLoading={loading} onRangeChange={onR1}
-        downloadName="corredor-tasas">
+        downloadName="corredor-tasas"
+        lastValue={(() => { const l = ultimaObs(series.tpm); return l ? { label: 'TPM', value: l.valor, fecha: xFmt(l.fecha.slice(0,7)), unit: '%' } : undefined })()}>
         <LineChartSimple
           data={filterMergedByRange(corredor, r1[0], r1[1])}
           series={[

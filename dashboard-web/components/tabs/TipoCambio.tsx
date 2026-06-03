@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries } from '@/lib/queries'
-import { merge, yoyGrowth, filterByRange, filterMergedByRange, momGrowth, dailyYoYGrowth, monthsAgo, xFmtMonth } from '@/lib/utils'
+import { merge, yoyGrowth, filterByRange, filterMergedByRange, momGrowth, dailyYoYGrowth, monthsAgo, xFmtMonth, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import LineChartSimple from '@/components/charts/LineChartSimple'
 import BarChartVert from '@/components/charts/BarChartVert'
@@ -155,7 +155,8 @@ export default function TipoCambio() {
       <ChartWrapper title="Tipo de Cambio Diario y Depreciación Interanual"
         subtitle="Venta (RD$/US$) y tasa de depreciación % — Frecuencia diaria"
         from={r1[0]} to={r1[1]} isLoading={loading} onRangeChange={onR1}
-        downloadName="tcn-diario-depreciacion" fullWidth>
+        downloadName="tcn-diario-depreciacion" fullWidth
+        lastValue={(() => { const l = ultimaObs(series.tcn_venta); return l ? { label: 'TCN Venta', value: l.valor, fecha: l.fecha.slice(0,10), unit: 'RD$/US$' } : undefined })()}>
         <ComboChartDual
           data={tcnDeprDual.filter(d => d.fecha >= r1[0] && d.fecha <= r1[1])}
           barKey="tcn" barLabel="TCN Venta (RD$/US$)" barColor={C.blue}
@@ -184,7 +185,8 @@ export default function TipoCambio() {
       <ChartWrapper title="Índice de Tipo de Cambio Real (TCR)"
         subtitle="Calculado: (TCN/1.3587) × (CPI_USA/218.076×100) / IPC_RD"
         from={r3[0]} to={r3[1]} isLoading={loading} onRangeChange={onR3}
-        downloadName="tcr-depreciacion">
+        downloadName="tcr-depreciacion"
+        lastValue={(() => { const l = ultimaObs(tcrData); return l ? { label: 'TCR', value: l.valor, fecha: xFmtM(l.fecha.slice(0,7)), unit: 'índice' } : undefined })()}>
         <ComboChartDual
           data={tcrMerged.filter(d => d.fecha >= r3[0] && d.fecha <= r3[1])}
           barKey="tcr" barLabel="TCR (Índice)" barColor={C.blue}
