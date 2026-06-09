@@ -158,7 +158,12 @@ export default function TipoCambio() {
         downloadName="tcn-diario-depreciacion" fullWidth
         lastValue={(() => { const l = ultimaObs(series.tcn_venta); return l ? { label: 'TCN Venta', value: l.valor, fecha: l.fecha.slice(0,10), unit: 'RD$/US$' } : undefined })()}>
         <ComboChartDual
-          data={tcnDeprDual.filter(d => d.fecha >= r1[0] && d.fecha <= r1[1])}
+          data={tcnDeprDual.filter(d => {
+            // Comparar mes-a-mes (YYYY-MM) en vez de día-vs-mes para que
+            // los últimos días del mes vigente NO queden excluidos.
+            const m = d.fecha.slice(0, 7)
+            return m >= r1[0] && m <= r1[1]
+          })}
           barKey="tcn" barLabel="TCN Venta (RD$/US$)" barColor={C.blue}
           lineKey="depr" lineLabel="Depreciación interanual %" lineColor={C.red}
           yLeftFormatter={v => `${v.toFixed(1)}`}

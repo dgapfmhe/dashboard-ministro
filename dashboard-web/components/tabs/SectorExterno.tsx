@@ -438,12 +438,43 @@ export default function SectorExterno() {
 
       {/* Tabla 1 — Identidad de Balanza de Pagos (BoP cierra a ~0 vía MBP6) */}
       <div className="col-span-full bg-white rounded-xl border border-[#D1D9E0] shadow-sm p-4">
-        <h3 className="text-[13px] font-semibold text-[#1A202C] mb-1">
-          Tabla 1 — Identidad de la Balanza de Pagos (MM US$)
-        </h3>
-        <p className="text-[10px] text-[#6B7280] mb-3 font-mono">
-          Cuenta Corriente + Cuenta Capital + Cuenta Financiera (entrada neta) + Errores y Omisiones − Δ Reservas ≡ 0
-        </p>
+        {(() => {
+          // Fecha de corte = último fecha disponible entre TODAS las vars BoP
+          const allBopArrs: (DataPoint[] | undefined)[] = [
+            series.saldo_cc_bp, series.bal_bienes_bp, series.bal_serv_bp,
+            series.ingr_prim_bp, series.ingr_sec_bp, series.cta_cap_bp,
+            series.cta_fin_bp, series.ied_bp, series.inv_cart_bp,
+            series.eyo_bp, series.act_res_bp,
+          ]
+          let cutoff = ''
+          for (const arr of allBopArrs) {
+            for (const d of (arr ?? [])) {
+              if (!isFinite(d.valor)) continue
+              if (d.fecha > cutoff) cutoff = d.fecha
+            }
+          }
+          const cutoffYr = cutoff.slice(0, 4)
+          const cutoffMo = parseInt(cutoff.slice(5, 7), 10)
+          const Qmap: Record<number, string> = { 1: 'Q1', 4: 'Q2', 7: 'Q3', 10: 'Q4' }
+          const cutoffQ = Qmap[cutoffMo] ?? `mes ${cutoffMo}`
+          return (
+            <>
+              <div className="flex items-start justify-between mb-1">
+                <h3 className="text-[13px] font-semibold text-[#1A202C]">
+                  Tabla 1 — Identidad de la Balanza de Pagos (MM US$)
+                </h3>
+                {cutoff && (
+                  <div className="text-[10px] text-[#1B3A5C] bg-[#EEF0F4] px-2 py-0.5 rounded font-semibold">
+                    Datos hasta {cutoffQ} {cutoffYr}
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-[#6B7280] mb-3 font-mono">
+                Cuenta Corriente + Cuenta Capital + Cuenta Financiera (entrada neta) + Errores y Omisiones − Δ Reservas ≡ 0
+              </p>
+            </>
+          )
+        })()}
         {(() => {
           const sumByYear = (arr?: DataPoint[]) => {
             if (!arr) return {} as Record<string, number>
@@ -455,7 +486,18 @@ export default function SectorExterno() {
             }
             return m
           }
+          const countByYear = (arr?: DataPoint[]) => {
+            if (!arr) return {} as Record<string, number>
+            const m: Record<string, number> = {}
+            for (const d of arr) {
+              if (!isFinite(d.valor)) continue
+              const y = d.fecha.slice(0, 4)
+              m[y] = (m[y] ?? 0) + 1
+            }
+            return m
+          }
           const cc        = sumByYear(series.saldo_cc_bp)
+          const ccN       = countByYear(series.saldo_cc_bp)  // # trimestres por año
           const balB      = sumByYear(series.bal_bienes_bp)
           const balS      = sumByYear(series.bal_serv_bp)
           const ingrPrim  = sumByYear(series.ingr_prim_bp)
@@ -475,6 +517,8 @@ export default function SectorExterno() {
           if (!yr1 || !yr2) {
             return <p className="text-[11px] text-[#9CA3AF] italic">Sin datos suficientes.</p>
           }
+          const partial1 = (ccN[yr1] ?? 0) < 4 ? ` (parcial: ${ccN[yr1]}Q)` : ''
+          const partial2 = (ccN[yr2] ?? 0) < 4 ? ` (parcial: ${ccN[yr2]}Q)` : ''
           const fmt = (n: number | undefined) =>
             n == null || !isFinite(n) ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(0)}`
 
@@ -507,8 +551,8 @@ export default function SectorExterno() {
                 <thead>
                   <tr className="bg-[#F0F2F5] text-[#1A202C]">
                     <th className="px-2 py-1.5 text-left font-semibold">Concepto</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">{yr1}</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">{yr2}</th>
+                    <th className="px-2 py-1.5 text-right font-semibold">{yr1}{partial1}</th>
+                    <th className="px-2 py-1.5 text-right font-semibold">{yr2}{partial2}</th>
                   </tr>
                 </thead>
                 <tbody>
