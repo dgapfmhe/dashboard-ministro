@@ -1382,11 +1382,13 @@ def parser_balanza_pagos(path: Path) -> pd.DataFrame:
         log.warning("balanza_pagos: fila de años no encontrada")
         return pd.DataFrame()
 
-    # Quarter row is typically 3 rows after the year row in BoP
+    # Quarter row: tolera sufijos preliminares (*, (p)) — ej "E-M*" → "E-M"
+    def _clean_q(s: str) -> str:
+        return str(s).strip().rstrip("*").rstrip().rstrip("()p").strip().upper()
     quarter_row = None
     for i in range(year_row + 1, min(year_row + 6, raw.shape[0])):
         c = sum(1 for j in range(1, raw.shape[1])
-                if str(raw.iloc[i, j]).strip().upper() in ("E-M", "A-J", "J-S", "O-D"))
+                if _clean_q(raw.iloc[i, j]) in ("E-M", "A-J", "J-S", "O-D"))
         if c > 5:
             quarter_row = i
             break
@@ -1394,21 +1396,21 @@ def parser_balanza_pagos(path: Path) -> pd.DataFrame:
         log.warning("balanza_pagos: fila de trimestres no encontrada")
         return pd.DataFrame()
 
-    # Build col → date map
+    # Build col → date map (acepta '2025', '2025*', '2025 (p)' en year row)
     col_dates: dict[int, date] = {}
     current_year: int | None = None
     Q_MAP = {"E-M": 1, "A-J": 4, "J-S": 7, "O-D": 10}
     for j in range(1, raw.shape[1]):
         v_year = raw.iloc[year_row, j]
         if pd.notna(v_year):
-            m = re.match(r'^(\d{4})', str(v_year).strip())
+            m = re.match(r'^\s*(\d{4})', str(v_year).strip())
             if m:
                 yr = int(m.group(1))
                 if 1990 <= yr <= 2100:
                     current_year = yr
         if current_year is None:
             continue
-        q_str = str(raw.iloc[quarter_row, j]).strip().upper()
+        q_str = _clean_q(raw.iloc[quarter_row, j])
         month = Q_MAP.get(q_str)
         if month is not None:
             col_dates[j] = date(current_year, month, 1)
