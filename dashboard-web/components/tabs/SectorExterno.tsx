@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { fetchSeries, fetchWorldBankGDP } from '@/lib/queries'
-import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q, xFmtMonth, ultimaObs } from '@/lib/utils'
+import { aggregateAnnual, filterByRange, merge, movingAverage, yoyGrowth, monthsAgo, pibTrailing4Q, xFmtMonth, xFmtQuarter, ultimaObs } from '@/lib/utils'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import BarChartVert from '@/components/charts/BarChartVert'
 import BarChartHoriz, { HBarSeries } from '@/components/charts/BarChartHoriz'
@@ -280,13 +280,13 @@ export default function SectorExterno() {
         subtitle="MM de US$ — Cuenta Financiera BoP (trimestral, BCRD)"
         from={rRem[0]} to={rRem[1]} onRangeChange={onRRem}
         isLoading={loading} downloadName="ied-bp"
-        lastValue={(() => { const l = ultimaObs(series.ied_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtMon(l.fecha), unit: 'MM US$' } : undefined })()}>
+        lastValue={(() => { const l = ultimaObs(series.ied_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtQuarter(l.fecha), unit: 'MM US$' } : undefined })()}>
         <BarChartVert
           data={(series.ied_bp ?? [])
             .filter(d => isFinite(d.valor) && d.fecha.slice(0,7) >= rRem[0] && d.fecha.slice(0,7) <= rRem[1])
             .map(d => ({ fecha: d.fecha.slice(0,7), valor: d.valor }))}
           color={C.purple} unit="MM US$"
-          xFormatter={xFmtMon}
+          xFormatter={xFmtQuarter}
           yFormatter={v => `${v.toFixed(0)}`}
           label="IED" />
       </ChartWrapper>
@@ -296,13 +296,13 @@ export default function SectorExterno() {
         subtitle="MM de US$ — Viajes (BoP, trimestral, BCRD)"
         from={rTur[0]} to={rTur[1]} onRangeChange={onRTur}
         isLoading={loading} downloadName="ingresos-turismo-bp"
-        lastValue={(() => { const l = ultimaObs(series.viajes_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtMon(l.fecha), unit: 'MM US$' } : undefined })()}>
+        lastValue={(() => { const l = ultimaObs(series.viajes_bp); return l ? { label: 'Último Q', value: l.valor, fecha: xFmtQuarter(l.fecha), unit: 'MM US$' } : undefined })()}>
         <BarChartVert
           data={(series.viajes_bp ?? [])
             .filter(d => isFinite(d.valor) && d.fecha.slice(0,7) >= rTur[0] && d.fecha.slice(0,7) <= rTur[1])
             .map(d => ({ fecha: d.fecha.slice(0,7), valor: d.valor }))}
           color={C.teal} unit="MM US$"
-          xFormatter={xFmtMon}
+          xFormatter={xFmtQuarter}
           yFormatter={v => `${v.toFixed(0)}`}
           label="Ingresos viajes" />
       </ChartWrapper>

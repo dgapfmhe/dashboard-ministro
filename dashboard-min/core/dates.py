@@ -100,7 +100,10 @@ def normalizar_fechas(
     out["fecha"] = pd.to_datetime(out["fecha"], errors="coerce")
     out = out.dropna(subset=["fecha"])
 
-    freqs = out["variable_id"].map(freq_map).fillna("mensual")
+    # Variables NO mapeadas → "diaria" (NO snapear). Antes era "mensual", lo que
+    # colapsaba silenciosamente las fechas diarias de variables ausentes del
+    # catálogo (deprem_cp, eur_usd) al día 1 del mes. Default seguro: no tocar.
+    freqs = out["variable_id"].map(freq_map).fillna("diaria")
     is_month = freqs.isin(["mensual", "trimestral"])
     is_year = freqs.eq("anual")
     out.loc[is_month, "fecha"] = (

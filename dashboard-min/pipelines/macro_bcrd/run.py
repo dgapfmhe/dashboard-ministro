@@ -150,8 +150,16 @@ def run(
     df_derivadas = etapa_derivadas(df_directas, filtrar_derivadas(catalogo))
     df_largo = pd.concat([df_directas, df_derivadas], ignore_index=True)
 
-    # 2.5 Normaliza fechas: snap mensual a 1er día + descarta proyecciones futuras
+    # 2.5 Normaliza fechas: snap mensual a 1er día + descarta proyecciones futuras.
+    # freq_map se arma desde el catálogo COMPLETO (catalog_r.TODAS, 539 vars) y NO
+    # solo desde `catalogo` (cargar_catalogo_completo = 178 vars del catálogo viejo).
+    # De lo contrario variables diarias como deprem_cp/eur_usd quedan AUSENTES,
+    # normalizar_fechas las trata como "mensual" y colapsa sus fechas diarias al
+    # día 1 del mes (bug: deprem_cp dejaba de actualizarse).
+    from core.catalog_r import TODAS as _CAT_COMPLETO
     freq_map = {v["id"]: v["frecuencia"] for v in catalogo}
+    for v in _CAT_COMPLETO:
+        freq_map.setdefault(v["id"], v["frecuencia"])
     df_largo = normalizar_fechas(df_largo, freq_map)
 
     # 3. Excel respaldo

@@ -186,6 +186,16 @@ export function xFmtDay(v: string): string {
 export function xFmtYear(v: string): string {
   return v?.slice(0, 4) ?? v
 }
+/* Formato trimestral: YYYY-MM → "Q4 2025". Mapeo de mes-inicio-de-trimestre:
+ *   01→Q1, 04→Q2, 07→Q3, 10→Q4. Para meses intermedios calcula el trimestre. */
+export function xFmtQuarter(v: string): string {
+  if (!v || v.length < 7) return v
+  const [y, m] = v.split('-')
+  const mn = parseInt(m, 10)
+  if (mn < 1 || mn > 12) return v
+  const q = Math.floor((mn - 1) / 3) + 1
+  return `Q${q} ${y}`
+}
 
 export function fmtMillones(v: number): string {
   if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}B`
