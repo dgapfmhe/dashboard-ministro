@@ -51,8 +51,8 @@ export default function Header({ lastUpdate }: Props) {
             </svg>
           </div>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-bold tracking-tight leading-tight truncate">Panel Macroeconómico</h1>
-            <p className="text-[10px] text-white/60 leading-tight">Monitor de Indicadores Financieros y Económicos</p>
+            <h1 className="text-[15px] font-bold tracking-tight leading-tight truncate">Dashboard Macro</h1>
+            <p className="text-[10px] text-white/60 leading-tight">Panel a la carta</p>
           </div>
         </div>
 

@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Panel Macroeconómico',
-  description: 'Monitor de indicadores macroeconómicos y financieros',
+  title: 'Dashboard Macro',
+  description: 'Panel a la carta',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
