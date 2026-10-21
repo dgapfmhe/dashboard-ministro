@@ -24,6 +24,10 @@ on:
         description: "Re-subir todos los índices (tras cambiar categorías/modelos)"
         type: boolean
         default: false
+      omitir_scraper:
+        description: "Saltar el scraper (solo textos, sentimiento, índices y pronósticos)"
+        type: boolean
+        default: false
 
 concurrency:
   group: noticias
@@ -70,6 +74,7 @@ jobs:
 
       - name: 1 · Scraper diario (t-1 + re-barrido t-3 + barrido general)
         id: scraper
+        if: ${{ !inputs.omitir_scraper }}
         continue-on-error: true
         working-directory: dashboard-min
         run: |
@@ -82,6 +87,7 @@ jobs:
         run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "scraper diario $(date -u +%F)"
 
       - name: 2 · Backfill de categorías nuevas
+        if: ${{ !inputs.omitir_scraper }}
         continue-on-error: true
         working-directory: dashboard-min
         run: python -m pipelines.noticias.scraper categorias-nuevas --minutos 30
