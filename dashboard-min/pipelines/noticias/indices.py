@@ -259,7 +259,12 @@ def _sb():
 def _upsert(sb, tabla: str, df: pd.DataFrame, conflicto: str, lote: int = 1000) -> int:
     if df is None or df.empty:
         return 0
-    recs = df.replace({np.nan: None}).to_dict("records")
+    enteras = {"n", "n_pos", "n_neu", "n_neg", "n_oro", "n_obs", "n_queries", "nivel"}
+    recs = df.astype(object).where(df.notna(), None).to_dict("records")
+    for r in recs:
+        for k in enteras & r.keys():
+            if r[k] is not None:
+                r[k] = int(r[k])
     for i in range(0, len(recs), lote):
         for intento in range(4):
             try:
@@ -303,7 +308,7 @@ def noticias_recientes(alm: Almacen, cfg: Config, modelo: str) -> pd.DataFrame:
         cs = set(r.cats_query if r.cats_query is not None else []) | set(r.cats_clave if r.cats_clave is not None else [])
         return sorted({c.split(".")[0] for c in cs} & sect)
 
-    df["sectores"] = df.apply(sectores, axis=1)
+    df["sectores"] = [sectores(r) for r in df.itertuples(index=False)]
     df = df[df["sectores"].map(len) > 0]
     return pd.DataFrame({
         "id": df["id"], "fecha": pd.to_datetime(df["fecha"]).dt.strftime("%Y-%m-%d"),
