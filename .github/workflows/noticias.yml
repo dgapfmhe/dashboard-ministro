@@ -110,6 +110,14 @@ jobs:
           if [ "${{ inputs.indices_completo }}" = "true" ]; then ARGS="--completo"; fi
           python -m pipelines.noticias.indices $ARGS
 
+      - name: 6 · Pronósticos oficiales (laboratorio) → Supabase
+        continue-on-error: true
+        working-directory: dashboard-min
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python -m pipelines.noticias.pronosticos
+
       - name: Guardar datos
         if: always()
         run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "sentimiento + indices $(date -u +%F)"

@@ -310,7 +310,7 @@ function MapaCalor({ sectores, uni, modelo, pesos, params, onSelect, seleccion }
     const cols = todas.slice(-nCols)
     const filas = sectores.map(s => {
       const a = ag.filter(x => x.categoria_id === s.id)
-      let serie: Record<string, number | null> = {}
+      const serie: Record<string, number | null> = {}
       const nmap: Record<string, number> = {}
       for (const x of a) nmap[x.fecha.slice(0, 10)] = x.n
       if (metrica === 'isep') {

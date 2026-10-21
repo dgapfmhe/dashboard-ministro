@@ -1,0 +1,48 @@
+# Especificaciones de los PRONÓSTICOS OFICIALES (corren a diario en GitHub Actions
+# con el mismo motor del Laboratorio: dashboard-web/public/lab/laboratorio.py).
+# Cada spec se compara siempre contra paseo aleatorio y AR(p) (se agregan solos).
+#
+# Congelado: el primer pronóstico emitido tras cerrar el mes objetivo (sentimiento
+# completo) queda fijo en pred_vintage y se compara con el dato real al publicarse.
+#
+# sentimiento.fuente: isec | isep | sps   (ISEP = filtrado, tiempo real)
+
+comunes: &comunes
+  frecuencia: M
+  desde: "2017-01-01"
+  backtest: {esquema: expanding, min_train: 36, reestimar_cada: 12}
+  modelos:
+    - {id: sarimax, tipo: sarimax, p: 1, d: 0, q: 1}
+    - {id: arx, tipo: arx, p: 2}
+
+specs:
+  - id: ipc_isec
+    descripcion: "Inflación mensual (IPC General % m/m) + ISEC General"
+    objetivo: {id: ipc_rd, transformacion: pct_mm, escala_interanual: true}
+    sentimiento: {fuente: isec, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes
+  - id: ipc_isep
+    descripcion: "Inflación mensual (IPC General % m/m) + ISEP General"
+    objetivo: {id: ipc_rd, transformacion: pct_mm, escala_interanual: true}
+    sentimiento: {fuente: isep, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes
+  - id: ipc_sps
+    descripcion: "Inflación mensual (IPC General % m/m) + SPS General (con ruido)"
+    objetivo: {id: ipc_rd, transformacion: pct_mm, escala_interanual: true}
+    sentimiento: {fuente: sps, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes
+  - id: imae_isec
+    descripcion: "IMAE % interanual + ISEC General"
+    objetivo: {id: imae, transformacion: pct_aa}
+    sentimiento: {fuente: isec, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes
+  - id: imae_isep
+    descripcion: "IMAE % interanual + ISEP General"
+    objetivo: {id: imae, transformacion: pct_aa}
+    sentimiento: {fuente: isep, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes
+  - id: imae_sps
+    descripcion: "IMAE % interanual + SPS General (con ruido)"
+    objetivo: {id: imae, transformacion: pct_aa}
+    sentimiento: {fuente: sps, categoria: GEN, universo: query, rezago: 0}
+    <<: *comunes

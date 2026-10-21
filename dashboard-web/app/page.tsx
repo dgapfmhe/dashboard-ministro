@@ -10,6 +10,7 @@ import SectorElectrico from '@/components/tabs/SectorElectrico'
 import Personalizado from '@/components/tabs/Personalizado'
 import Sintesis from '@/components/tabs/Sintesis'
 import Sentimiento from '@/components/tabs/Sentimiento'
+import Laboratorio from '@/components/tabs/Laboratorio'
 
 const TABS = [
   { id: 'sintesis',             label: 'Síntesis Macro' },
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'tipo-cambio',          label: 'Tipo de Cambio' },
   { id: 'sector-electrico',     label: 'Sector Eléctrico' },
   { id: 'sentimiento',          label: 'Sentimiento de Prensa' },
+  { id: 'laboratorio',          label: 'Laboratorio de Pronósticos' },
   { id: 'personalizado',        label: 'Personalizado' },
 ] as const
 
@@ -68,6 +70,7 @@ export default function Home() {
         {mounted && active === 'tipo-cambio'         && <TipoCambio />}
         {mounted && active === 'sector-electrico'    && <SectorElectrico />}
         {mounted && active === 'sentimiento'         && <Sentimiento />}
+        {mounted && active === 'laboratorio'         && <Laboratorio />}
         {mounted && active === 'personalizado'       && <Personalizado />}
       </main>
 
