@@ -1,0 +1,67 @@
+name: Nueva categoría de noticias
+description: Agrega una categoría al scraper de sentimiento (se sigue desde hoy, se re-etiqueta la historia y se intenta backfill).
+title: "[categoría] "
+labels: ["nueva-categoria"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Solo se aplica si la abre el dueño o un colaborador del repositorio.
+        Las búsquedas usan sintaxis de Google News: `(termino OR "frase exacta") AND "Republica Dominicana"`.
+        De las búsquedas se derivan solas las palabras clave para re-etiquetar la historia.
+  - type: input
+    id: codigo
+    attributes:
+      label: Código
+      description: "Corto, MAYÚSCULAS, sin espacios. Ej: ARANC, AI, MINERIA"
+    validations: {required: true}
+  - type: input
+    id: nombre
+    attributes:
+      label: Nombre
+      description: "Ej: Aranceles de EE.UU."
+    validations: {required: true}
+  - type: dropdown
+    id: sector
+    attributes:
+      label: Ubicación
+      description: Sector propio nuevo, o subcategoría dentro de un sector existente
+      options:
+        - "Sector nuevo"
+        - GEN
+        - ACT
+        - INF
+        - PM
+        - TC
+        - REM
+        - EXT
+        - FISC
+        - EXP
+        - TUR
+        - CONS
+        - AGRO
+        - MANU
+        - ZF
+        - COM
+        - ENER
+        - TRANS
+        - FIN
+        - INMO
+    validations: {required: true}
+  - type: textarea
+    id: queries
+    attributes:
+      label: Búsquedas (una por línea)
+      placeholder: '(aranceles OR "guerra comercial" OR Trump) AND "Republica Dominicana"'
+    validations: {required: true}
+  - type: textarea
+    id: palabras
+    attributes:
+      label: Palabras clave (opcional, una por línea)
+      description: Si se deja vacío se derivan de las búsquedas.
+  - type: dropdown
+    id: backfill
+    attributes:
+      label: Backfill hacia atrás
+      options: ["365", "180", "90", "30", "0"]
+      default: 0

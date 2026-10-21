@@ -1,0 +1,46 @@
+# Barrido general ("capturar todo"): por cada medio dominicano se pide a Google
+# News todo lo publicado el día (site:dominio). Google entrega como máximo 100
+# notas por consulta; si un medio SATURA (100), se parte por sus secciones.
+# Agregar/quitar medios aquí. `secciones` = rutas del sitio (site:dominio/seccion).
+#
+# `rss`: feeds propios del medio. Solo sirven para obtener la URL directa de las
+# notas más recientes sin decodificar el enlace de Google (ahorra peticiones).
+
+medios:
+  - dominio: diariolibre.com
+    secciones: [economia, politica, actualidad, mundo, deportes, revista, opinion, usa, planeta, ciencia-y-tecnologia]
+    rss: [https://www.diariolibre.com/rss/portada.xml, https://www.diariolibre.com/rss/economia.xml]
+  - dominio: listindiario.com
+    secciones: [economia, la-republica, las-mundiales, el-deporte, entretenimiento, puntos-de-vista, la-vida, las-sociales]
+  - dominio: acento.com.do
+    secciones: [economia, politica, actualidad, internacional, deportes, opinion, cultura, tecnologia]
+  - dominio: hoy.com.do
+    secciones: [economia, panorama, opiniones, alegria, deportes, mundiales]
+  - dominio: elcaribe.com.do
+    secciones: [panorama, gente, deportes, opiniones, economia]
+  - dominio: eldinero.com.do
+    rss: [https://eldinero.com.do/feed/]
+  - dominio: n.com.do
+    rss: [https://n.com.do/feed/]
+  - dominio: elnuevodiario.com.do
+    rss: [https://elnuevodiario.com.do/feed/]
+  - dominio: elnacional.com.do
+  - dominio: noticiassin.com
+    rss: [https://noticiassin.com/feed/]
+  - dominio: cdn.com.do
+  - dominio: eldia.com.do
+  - dominio: ensegundos.do
+  - dominio: 7dias.com.do
+  - dominio: z101digital.com
+  - dominio: almomento.net
+  - dominio: diariodominicano.com
+  - dominio: proceso.com.do
+  - dominio: remolacha.net
+  - dominio: primiciasrd.com
+  - dominio: elsoldelafrontera.com
+  - dominio: eljaya.com
+  - dominio: arecoa.com
+  - dominio: dominicanostoday.com      # en inglés
+  - dominio: bancentral.gov.do
+  - dominio: hacienda.gob.do
+  - dominio: mepyd.gob.do

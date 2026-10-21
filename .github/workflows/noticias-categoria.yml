@@ -1,0 +1,55 @@
+name: Noticias · nueva categoría (desde issue)
+
+# Se dispara con el formulario "Nueva categoría de noticias". Solo aplica si quien
+# abre el issue es dueño/miembro/colaborador del repo (el dashboard es público).
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  agregar:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'nueva-categoria') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: categorias
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml pandas pyarrow
+      - name: Agregar al YAML
+        id: add
+        working-directory: dashboard-min
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python -m pipelines.noticias.herramientas.agregar_categoria
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard-min/pipelines/noticias/config/categorias.yaml
+          git commit -m "feat(noticias): categoría ${{ steps.add.outputs.id }} (issue #${{ github.event.issue.number }})"
+          git pull --rebase -q && git push
+      - name: Responder y cerrar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} -R ${{ github.repository }} --body \
+            "Categoría \`${{ steps.add.outputs.id }}\` agregada. El próximo scraper diario (06:00 RD) la sigue desde hoy, re-etiqueta la historia con sus palabras clave y, si pediste backfill, avanza hacia atrás semana a semana."
+          gh issue close ${{ github.event.issue.number }} -R ${{ github.repository }}
+      - name: Avisar error
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} -R ${{ github.repository }} --body \
+            "No se pudo agregar la categoría. Revisa el log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

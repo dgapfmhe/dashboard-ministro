@@ -9,6 +9,7 @@ import TipoCambio from '@/components/tabs/TipoCambio'
 import SectorElectrico from '@/components/tabs/SectorElectrico'
 import Personalizado from '@/components/tabs/Personalizado'
 import Sintesis from '@/components/tabs/Sintesis'
+import Sentimiento from '@/components/tabs/Sentimiento'
 
 const TABS = [
   { id: 'sintesis',             label: 'Síntesis Macro' },
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'tasas',                label: 'Tasas' },
   { id: 'tipo-cambio',          label: 'Tipo de Cambio' },
   { id: 'sector-electrico',     label: 'Sector Eléctrico' },
+  { id: 'sentimiento',          label: 'Sentimiento de Prensa' },
   { id: 'personalizado',        label: 'Personalizado' },
 ] as const
 
@@ -65,6 +67,7 @@ export default function Home() {
         {mounted && active === 'tasas'               && <Tasas />}
         {mounted && active === 'tipo-cambio'         && <TipoCambio />}
         {mounted && active === 'sector-electrico'    && <SectorElectrico />}
+        {mounted && active === 'sentimiento'         && <Sentimiento />}
         {mounted && active === 'personalizado'       && <Personalizado />}
       </main>
 
@@ -72,7 +75,7 @@ export default function Home() {
       <footer className="bg-white border-t border-[#D1D9E0] mt-auto">
         <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between">
           <p className="text-[10px] text-[#9CA3AF]">
-            Fuentes: BCRD · DGII · DGAPF · MEM · FRED · Yahoo Finance · Banco Mundial
+            Fuentes: BCRD · DGII · DGAPF · MEM · FRED · Yahoo Finance · Banco Mundial · Google News
           </p>
           <p className="text-[10px] text-[#9CA3AF]">
             Actualización automática vía GitHub Actions

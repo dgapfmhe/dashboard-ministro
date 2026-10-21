@@ -1,0 +1,641 @@
+version: 1
+notas: 'Fuente de verdad de las categorías. Las de origen ''investigacion'' están congeladas (no editar sus queries: rompen la comparabilidad del ISEC). Para agregar una categoría nueva usa el formulario de issue ''Nueva categoría de noticias'' o agrega un bloque con origen: usuario.'
+sectores:
+- id: GEN
+  nombre: General
+  nombre_investigacion: General · Resumen Sectorial
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: GEN.inflacion_y_precios
+    nombre: Inflacion y Precios
+    queries:
+    - '("indice de precios al consumidor" OR IPC OR inflacion OR "inflacion interanual" OR "inflacion subyacente" OR "costo de vida" OR "canasta basica" OR "canasta familiar") AND "Republica Dominicana"'
+  - id: GEN.actividad_y_crecimiento
+    nombre: Actividad y Crecimiento
+    queries:
+    - '(PIB OR "producto interno bruto" OR IMAE OR "actividad economica" OR "crecimiento economico" OR "cuentas nacionales") AND "Republica Dominicana"'
+  - id: GEN.politica_monetaria
+    nombre: Politica Monetaria
+    queries:
+    - '("Banco Central" OR BCRD OR "junta monetaria") AND ("tasa de politica monetaria" OR "tasa de referencia" OR "politica monetaria" OR "meta de inflacion" OR "encaje legal") AND "Republica Dominicana"'
+  - id: GEN.tipo_de_cambio
+    nombre: Tipo de Cambio
+    queries:
+    - '(dolar OR "tipo de cambio" OR "tasa de cambio" OR "mercado cambiario" OR "reservas internacionales" OR depreciacion) AND "Republica Dominicana"'
+  - id: GEN.remesas
+    nombre: Remesas
+    queries:
+    - '(remesas OR "remesas familiares" OR "envios de dinero" OR remesadoras) AND "Republica Dominicana"'
+  - id: GEN.comercio_exterior
+    nombre: Comercio Exterior
+    queries:
+    - '(exportaciones OR importaciones OR "balanza comercial" OR "cuenta corriente" OR aranceles OR "balanza de pagos") AND "Republica Dominicana"'
+  - id: GEN.inversion_extranjera
+    nombre: Inversion Extranjera
+    queries:
+    - '("inversion extranjera directa" OR IED OR "inversion privada" OR "atraccion de inversiones" OR "clima de inversion") AND "Republica Dominicana"'
+  - id: GEN.finanzas_publicas
+    nombre: Finanzas Publicas
+    queries:
+    - '("deficit fiscal" OR "deuda publica" OR "presupuesto nacional" OR recaudacion OR DGII OR "Ministerio de Hacienda" OR "gasto publico") AND "Republica Dominicana"'
+  - id: GEN.empleo
+    nombre: Empleo
+    queries:
+    - '(empleo OR desempleo OR "mercado laboral" OR "salario minimo" OR informalidad OR cotizantes OR "Ministerio de Trabajo") AND "Republica Dominicana"'
+  - id: GEN.sector_financiero_y_credito
+    nombre: Sector Financiero y Credito
+    queries:
+    - '("sistema financiero" OR banca OR bancos OR credito OR "cartera de credito" OR morosidad OR "Superintendencia de Bancos") AND "Republica Dominicana"'
+  - id: GEN.turismo
+    nombre: Turismo
+    queries:
+    - '(turismo OR turistas OR "llegadas de turistas" OR "ingresos turisticos" OR hoteles OR Asonahores OR MITUR) AND "Republica Dominicana"'
+  - id: GEN.construccion
+    nombre: Construccion
+    queries:
+    - '(construccion OR "sector construccion" OR "permisos de construccion" OR cemento OR ACOPROVI OR "obras publicas") AND "Republica Dominicana"'
+  - id: GEN.inmobiliario_y_vivienda
+    nombre: Inmobiliario y Vivienda
+    queries:
+    - '(inmobiliario OR "mercado inmobiliario" OR vivienda OR hipotecas OR "precios de vivienda" OR "deficit habitacional") AND "Republica Dominicana"'
+  - id: GEN.electricidad
+    nombre: Electricidad
+    queries:
+    - '(electricidad OR apagones OR "sector electrico" OR "tarifa electrica" OR distribuidoras OR SENI OR "Punta Catalina") AND "Republica Dominicana"'
+  - id: GEN.combustibles
+    nombre: Combustibles
+    queries:
+    - '("precios de los combustibles" OR gasolina OR gasoil OR GLP OR petroleo OR Refidomsa) AND "Republica Dominicana"'
+  - id: GEN.zonas_francas
+    nombre: Zonas Francas
+    queries:
+    - '("zonas francas" OR ADOZONA OR CNZFE OR nearshoring OR "parques de zonas francas") AND "Republica Dominicana"'
+  - id: GEN.industria_y_manufactura
+    nombre: Industria y Manufactura
+    queries:
+    - '(industria OR manufactura OR "industria local" OR AIRD OR agroindustria OR "valor agregado industrial") AND "Republica Dominicana"'
+  - id: GEN.agropecuario
+    nombre: Agropecuario
+    queries:
+    - '(agropecuario OR agricultura OR ganaderia OR "produccion agricola" OR "Ministerio de Agricultura" OR JAD) AND "Republica Dominicana"'
+  - id: GEN.comercio_interno_y_consumo
+    nombre: Comercio Interno y Consumo
+    queries:
+    - '("comercio minorista" OR "comercio interno" OR consumo OR "mercado interno" OR MIPYMES OR MICM OR retail) AND "Republica Dominicana"'
+- id: ACT
+  nombre: Actividad y Crecimiento
+  nombre_investigacion: Actividad y Crecimiento
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: ACT.pib_y_cuentas_nacionales
+    nombre: PIB y Cuentas Nacionales
+    queries:
+    - '(PIB OR "producto interno bruto" OR "cuentas nacionales" OR "PIB real" OR "crecimiento economico") AND "Republica Dominicana"'
+  - id: ACT.imae_alta_frecuencia
+    nombre: IMAE (alta frecuencia)
+    queries:
+    - '(IMAE OR "indicador mensual de actividad economica" OR "actividad economica") AND (BCRD OR "Banco Central") AND "Republica Dominicana"'
+  - id: ACT.ciclo_y_coyuntura
+    nombre: Ciclo y Coyuntura
+    queries:
+    - '("economia dominicana" OR "ciclo economico" OR "coyuntura economica") AND (desaceleracion OR recesion OR expansion OR dinamismo OR enfriamiento OR recalentamiento) AND "Republica Dominicana"'
+  - id: ACT.sectores_productivos
+    nombre: Sectores Productivos
+    queries:
+    - '("valor agregado" OR crecimiento OR desempeno) AND (mineria OR manufactura OR servicios OR agropecuario OR construccion OR comercio OR telecomunicaciones) AND "Republica Dominicana"'
+  - id: ACT.productividad_y_competitividad
+    nombre: Productividad y Competitividad
+    queries:
+    - '(productividad OR competitividad OR "facilidad de hacer negocios" OR "indice de competitividad") AND "Republica Dominicana"'
+  - id: ACT.proyecciones_de_organismos
+    nombre: Proyecciones de Organismos
+    queries:
+    - '(FMI OR "Banco Mundial" OR CEPAL OR BID OR "calificadoras") AND (crecimiento OR proyeccion OR perspectivas) AND "Republica Dominicana"'
+- id: INF
+  nombre: Inflación
+  nombre_investigacion: Inflacion (drivers IPC)
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: INF.ipc_e_indice_de_precios
+    nombre: IPC e Indice de Precios
+    queries:
+    - '("indice de precios al consumidor" OR IPC OR inflacion OR "inflacion interanual" OR "inflacion subyacente" OR "inflacion mensual") AND "Republica Dominicana"'
+    - '(ONE OR "Oficina Nacional de Estadistica" OR "Banco Central" OR BCRD) AND (inflacion OR IPC OR "indice de precios") AND "Republica Dominicana"'
+  - id: INF.costo_de_vida_y_canasta
+    nombre: Costo de Vida y Canasta
+    queries:
+    - '("costo de vida" OR "canasta basica" OR "canasta familiar" OR "poder adquisitivo" OR "canasta alimentaria") AND "Republica Dominicana"'
+  - id: INF.precios_de_alimentos
+    nombre: Precios de Alimentos
+    queries:
+    - '(alimentos OR comida OR supermercado OR colmado OR "canasta alimentaria") AND (precio OR costo) AND "Republica Dominicana"'
+    - '(arroz OR pollo OR huevo OR aceite OR azucar OR habichuela OR platano OR leche OR carne OR cebolla OR ajo) AND (precio OR costo) AND "Republica Dominicana"'
+  - id: INF.precios_de_energia_y_transporte
+    nombre: Precios de Energia y Transporte
+    queries:
+    - '(combustible OR gasolina OR gasoil OR GLP OR "tarifa electrica" OR pasaje OR transporte) AND (precio OR costo OR tarifa) AND "Republica Dominicana"'
+  - id: INF.precios_administrados_y_tributarios
+    nombre: Precios Administrados y Tributarios
+    queries:
+    - '("control de precios" OR "precios administrados" OR ITBIS OR arancel OR subsidio) AND (precio OR inflacion) AND "Republica Dominicana"'
+  - id: INF.inflacion_importada_y_commodities
+    nombre: Inflacion Importada y Commodities
+    queries:
+    - '("inflacion importada" OR "precios internacionales" OR "materias primas" OR trigo OR maiz OR soya) AND (precio OR inflacion) AND "Republica Dominicana"'
+  - id: INF.expectativas_y_meta_de_inflacion
+    nombre: Expectativas y Meta de Inflacion
+    queries:
+    - '("expectativas de inflacion" OR "meta de inflacion" OR "presion inflacionaria" OR "rango meta" OR "inercia inflacionaria") AND "Republica Dominicana"'
+- id: PM
+  nombre: Política Monetaria y BCRD
+  nombre_investigacion: Politica Monetaria y BCRD
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: PM.tasa_de_politica_monetaria_tpm
+    nombre: Tasa de Politica Monetaria (TPM)
+    queries:
+    - '("Banco Central" OR BCRD) AND ("tasa de politica monetaria" OR TPM OR "tasa de referencia") AND "Republica Dominicana"'
+  - id: PM.decisiones_y_comunicacion
+    nombre: Decisiones y Comunicacion
+    queries:
+    - '("Banco Central" OR BCRD OR "junta monetaria") AND (comunicado OR "reunion de politica monetaria" OR "programa monetario" OR "informe de politica monetaria") AND "Republica Dominicana"'
+    - '("Hector Valdez Albizu" OR gobernador) AND ("Banco Central" OR BCRD) AND "Republica Dominicana"'
+  - id: PM.liquidez_e_instrumentos
+    nombre: Liquidez e Instrumentos
+    queries:
+    - '(BCRD OR "Banco Central") AND ("encaje legal" OR liquidez OR "letras del Banco Central" OR "facilidades de liquidez" OR "agregados monetarios") AND "Republica Dominicana"'
+  - id: PM.transmision_a_tasas_de_mercado
+    nombre: Transmision a Tasas de Mercado
+    queries:
+    - '("tasas de interes activas" OR "tasas de interes pasivas" OR "tasa interbancaria" OR "costo del credito") AND "Republica Dominicana"'
+  - id: PM.esquema_metas_y_credibilidad
+    nombre: Esquema, Metas y Credibilidad
+    queries:
+    - '("esquema de metas de inflacion" OR "ancla nominal" OR "credibilidad del Banco Central" OR "independencia del Banco Central") AND "Republica Dominicana"'
+- id: TC
+  nombre: Tipo de Cambio
+  nombre_investigacion: Tipo de Cambio
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: TC.cotizacion_del_dolar
+    nombre: Cotizacion del Dolar
+    queries:
+    - '(dolar OR "tipo de cambio" OR "tasa de cambio" OR "precio del dolar" OR "mercado cambiario") AND "Republica Dominicana"'
+  - id: TC.dinamica_cambiaria
+    nombre: Dinamica Cambiaria
+    queries:
+    - '(depreciacion OR apreciacion OR "presion cambiaria" OR "volatilidad cambiaria" OR devaluacion OR "estabilidad cambiaria") AND "Republica Dominicana"'
+  - id: TC.reservas_e_intervencion
+    nombre: Reservas e Intervencion
+    queries:
+    - '("reservas internacionales" OR "intervencion cambiaria" OR "oferta de divisas" OR "demanda de divisas") AND (BCRD OR "Banco Central") AND "Republica Dominicana"'
+  - id: TC.generacion_de_divisas
+    nombre: Generacion de Divisas
+    queries:
+    - '(remesas OR turismo OR exportaciones OR "inversion extranjera" OR "zonas francas") AND divisas AND "Republica Dominicana"'
+- id: REM
+  nombre: Remesas
+  nombre_investigacion: Remesas
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: REM.flujo_de_remesas
+    nombre: Flujo de Remesas
+    queries:
+    - '(remesas OR "remesas familiares" OR "envios de dinero" OR "ingreso por remesas") AND "Republica Dominicana"'
+  - id: REM.origen_y_diaspora
+    nombre: Origen y Diaspora
+    queries:
+    - '(remesas) AND ("diaspora dominicana" OR "Estados Unidos" OR Espana OR "dominicanos en el exterior") AND "Republica Dominicana"'
+  - id: REM.canales_e_inclusion_financiera
+    nombre: Canales e Inclusion Financiera
+    queries:
+    - '(remesas) AND (banca OR remesadoras OR "agentes de remesas" OR digital OR "inclusion financiera" OR "billetera movil") AND "Republica Dominicana"'
+  - id: REM.impacto_macroeconomico
+    nombre: Impacto Macroeconomico
+    queries:
+    - '(remesas) AND (consumo OR PIB OR divisas OR pobreza OR "ingreso de los hogares") AND "Republica Dominicana"'
+- id: EXT
+  nombre: Sector Externo y Comercio
+  nombre_investigacion: Sector Externo y Comercio
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: EXT.exportaciones
+    nombre: Exportaciones
+    queries:
+    - '(exportaciones OR "exportaciones nacionales" OR "exportaciones totales" OR "oferta exportable") AND "Republica Dominicana"'
+  - id: EXT.importaciones_y_balanza
+    nombre: Importaciones y Balanza
+    queries:
+    - '(importaciones OR "balanza comercial" OR "deficit comercial" OR "cuenta corriente" OR "balanza de pagos") AND "Republica Dominicana"'
+  - id: EXT.aranceles_y_acuerdos_comerciales
+    nombre: Aranceles y Acuerdos Comerciales
+    queries:
+    - '(aranceles OR "guerra comercial" OR "DR-CAFTA" OR "acuerdo comercial" OR "tratado de libre comercio" OR "Organizacion Mundial del Comercio") AND "Republica Dominicana"'
+  - id: EXT.inversion_extranjera_directa_ied
+    nombre: Inversion Extranjera Directa (IED)
+    queries:
+    - '("inversion extranjera directa" OR IED OR "atraccion de inversiones" OR "inversion privada" OR ProDominicana) AND "Republica Dominicana"'
+  - id: EXT.integracion_y_competitividad
+    nombre: Integracion y Competitividad
+    queries:
+    - '(nearshoring OR competitividad OR "hub logistico" OR "cadena de suministro" OR encadenamientos) AND "Republica Dominicana"'
+  - id: EXT.socios_comerciales
+    nombre: Socios Comerciales
+    queries:
+    - '("Estados Unidos" OR China OR "Union Europea" OR Haiti) AND (comercio OR exportaciones OR importaciones OR acuerdo) AND "Republica Dominicana"'
+- id: FISC
+  nombre: Finanzas Públicas y Fiscal
+  nombre_investigacion: Finanzas Publicas y Fiscal
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: FISC.deficit_y_presupuesto
+    nombre: Deficit y Presupuesto
+    queries:
+    - '("deficit fiscal" OR "balance fiscal" OR "presupuesto nacional" OR "Presupuesto General del Estado" OR "gasto publico") AND "Republica Dominicana"'
+  - id: FISC.deuda_publica
+    nombre: Deuda Publica
+    queries:
+    - '("deuda publica" OR "deuda externa" OR "emision de bonos" OR "bonos soberanos" OR "servicio de la deuda" OR "sostenibilidad fiscal") AND "Republica Dominicana"'
+  - id: FISC.calificacion_y_riesgo_pais
+    nombre: Calificacion y Riesgo Pais
+    queries:
+    - '("calificacion de riesgo" OR "calificacion crediticia" OR Moodys OR Fitch OR "Standard and Poors" OR "grado de inversion" OR "riesgo pais" OR EMBI) AND "Republica Dominicana"'
+  - id: FISC.recaudacion_e_impuestos
+    nombre: Recaudacion e Impuestos
+    queries:
+    - '(DGII OR DGA OR recaudacion OR "ingresos tributarios" OR ITBIS OR "reforma fiscal" OR "presion tributaria" OR "pacto fiscal") AND "Republica Dominicana"'
+  - id: FISC.gasto_y_subsidios
+    nombre: Gasto y Subsidios
+    queries:
+    - '(subsidio OR subsidios OR transferencias) AND (combustible OR electricidad OR fertilizante OR "gasto social") AND "Republica Dominicana"'
+  - id: FISC.fmi_y_organismos
+    nombre: FMI y Organismos
+    queries:
+    - '(FMI OR "Fondo Monetario Internacional" OR "Articulo IV" OR "mision del FMI" OR "Banco Mundial") AND "Republica Dominicana"'
+- id: EXP
+  nombre: Expectativas y Confianza
+  nombre_investigacion: Expectativas y Confianza
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: EXP.expectativas_macroeconomicas
+    nombre: Expectativas Macroeconomicas
+    queries:
+    - '("expectativas de inflacion" OR "encuesta de expectativas macroeconomicas" OR "expectativas economicas" OR "perspectivas economicas") AND "Republica Dominicana"'
+  - id: EXP.confianza_empresarial
+    nombre: Confianza Empresarial
+    queries:
+    - '("confianza empresarial" OR "clima de negocios" OR "indice de confianza" OR "expectativas empresariales") AND "Republica Dominicana"'
+  - id: EXP.gremios_empresariales
+    nombre: Gremios Empresariales
+    queries:
+    - '(CONEP OR AIRD OR ANJE OR "sector privado" OR empresarios) AND (expectativas OR confianza OR "clima de negocios" OR optimismo OR incertidumbre) AND "Republica Dominicana"'
+  - id: EXP.confianza_del_consumidor
+    nombre: Confianza del Consumidor
+    queries:
+    - '("confianza del consumidor" OR "sentimiento del consumidor" OR "intencion de compra" OR "consumo de los hogares") AND "Republica Dominicana"'
+  - id: EXP.incertidumbre_y_riesgo
+    nombre: Incertidumbre y Riesgo
+    queries:
+    - '("incertidumbre economica" OR "riesgo politico" OR "estabilidad economica" OR "estabilidad politica") AND "Republica Dominicana"'
+- id: TUR
+  nombre: Turismo
+  nombre_investigacion: Turismo
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: TUR.llegadas_y_flujo_turistico
+    nombre: Llegadas y Flujo Turistico
+    queries:
+    - '(turismo OR turistas OR "llegadas de turistas" OR "no residentes" OR "flujo turistico" OR pernoctaciones OR visitantes) AND "Republica Dominicana"'
+  - id: TUR.ingresos_y_divisas_por_turismo
+    nombre: Ingresos y Divisas por Turismo
+    queries:
+    - '("ingresos turisticos" OR "divisas por turismo" OR "gasto turistico" OR "aporte del turismo") AND "Republica Dominicana"'
+  - id: TUR.hoteleria_y_gremio_asonahores
+    nombre: Hoteleria y Gremio (Asonahores)
+    queries:
+    - '(hoteles OR "ocupacion hotelera" OR Asonahores OR "all inclusive" OR resort OR "inversion hotelera" OR habitaciones) AND "Republica Dominicana"'
+  - id: TUR.tour_operadores_y_agencias
+    nombre: Tour Operadores y Agencias
+    queries:
+    - '(OPETUR OR ADOMPRETUR OR "agencias de viajes" OR turoperadores OR "mayoristas de viajes") AND "Republica Dominicana"'
+  - id: TUR.politica_y_promocion_mitur
+    nombre: Politica y Promocion (MITUR)
+    queries:
+    - '(MITUR OR "Ministerio de Turismo" OR "promocion turistica" OR "Gabinete de Turismo" OR "marca pais") AND "Republica Dominicana"'
+  - id: TUR.conectividad_aerea_y_aeropuertos
+    nombre: Conectividad Aerea y Aeropuertos
+    queries:
+    - '(aeropuerto OR AERODOM OR "Punta Cana" OR "Las Americas" OR Cibao OR vuelos OR "conectividad aerea" OR "asientos aereos") AND turismo AND "Republica Dominicana"'
+  - id: TUR.cruceros_y_puertos_turisticos
+    nombre: Cruceros y Puertos Turisticos
+    queries:
+    - '(cruceros OR "Amber Cove" OR "Taino Bay" OR "Cap Cana" OR "puerto de cruceros") AND "Republica Dominicana"'
+  - id: TUR.destinos_y_segmentos
+    nombre: Destinos y Segmentos
+    queries:
+    - '("Punta Cana" OR Bavaro OR "Puerto Plata" OR Samana OR Miches OR "La Romana" OR Bayahibe OR ecoturismo OR "turismo de bienestar") AND turismo AND "Republica Dominicana"'
+- id: CONS
+  nombre: Construcción
+  nombre_investigacion: Construccion
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: CONS.actividad_del_sector
+    nombre: Actividad del Sector
+    queries:
+    - '(construccion OR "sector construccion" OR "actividad constructora" OR "permisos de construccion" OR "metros cuadrados") AND "Republica Dominicana"'
+  - id: CONS.gremios_acoprovi_codia
+    nombre: Gremios (ACOPROVI / CODIA)
+    queries:
+    - '(ACOPROVI OR CODIA OR "Camara Dominicana de la Construccion" OR constructores) AND "Republica Dominicana"'
+  - id: CONS.materiales_de_construccion
+    nombre: Materiales de Construccion
+    queries:
+    - '(cemento OR varilla OR acero OR "materiales de construccion" OR ferreteria OR agregados) AND (precio OR costo OR demanda) AND "Republica Dominicana"'
+  - id: CONS.obras_publicas_e_infraestructura
+    nombre: Obras Publicas e Infraestructura
+    queries:
+    - '("obras publicas" OR MOPC OR infraestructura OR carreteras OR edificaciones OR puentes OR "Fideicomiso RD Vial") AND "Republica Dominicana"'
+  - id: CONS.proyectos_habitacionales
+    nombre: Proyectos Habitacionales
+    queries:
+    - '("proyectos habitacionales" OR "proyectos residenciales" OR urbanizaciones OR torres) AND construccion AND "Republica Dominicana"'
+  - id: CONS.empleo_y_financiamiento_del_sector
+    nombre: Empleo y Financiamiento del Sector
+    queries:
+    - '(construccion) AND (empleo OR financiamiento OR "credito a la construccion") AND "Republica Dominicana"'
+- id: AGRO
+  nombre: Agropecuario
+  nombre_investigacion: Agropecuario
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: AGRO.produccion_agropecuaria
+    nombre: Produccion Agropecuaria
+    queries:
+    - '(agropecuario OR agricultura OR ganaderia OR "sector agropecuario" OR "produccion agricola" OR "produccion nacional de alimentos") AND "Republica Dominicana"'
+  - id: AGRO.instituciones_del_agro
+    nombre: Instituciones del Agro
+    queries:
+    - '("Ministerio de Agricultura" OR "Banco Agricola" OR IAD OR INESPRE OR FEDA OR IDIAF OR "Tecnificacion Nacional de Riego") AND "Republica Dominicana"'
+  - id: AGRO.gremios_y_productores
+    nombre: Gremios y Productores
+    queries:
+    - '(JAD OR "Junta Agroempresarial Dominicana" OR CONALECHE OR productores OR "Confederacion Nacional de Productores Agropecuarios") AND "Republica Dominicana"'
+  - id: AGRO.rubros_agricolas
+    nombre: Rubros Agricolas
+    queries:
+    - '(arroz OR platano OR guineo OR habichuela OR cacao OR cafe OR aguacate OR mango OR banano OR tabaco OR maiz OR tomate OR sabila) AND (produccion OR precio OR cosecha) AND "Republica Dominicana"'
+  - id: AGRO.ganaderia_y_avicultura
+    nombre: Ganaderia y Avicultura
+    queries:
+    - '(ganaderia OR "sector avicola" OR lecheria OR "produccion lechera" OR silvopastoril) AND "Republica Dominicana"'
+  - id: AGRO.exportacion_agropecuaria
+    nombre: Exportacion Agropecuaria
+    queries:
+    - '(exportacion OR exportaciones) AND (agropecuaria OR agricola OR mango OR banano OR cacao OR aguacate OR "tomate cherry" OR vegetales OR tabaco OR ron) AND "Republica Dominicana"'
+  - id: AGRO.tecnificacion_y_modernizacion
+    nombre: Tecnificacion y Modernizacion
+    queries:
+    - '(mecanizacion OR "riego tecnificado" OR "modernizacion agricola" OR "innovacion agropecuaria") AND (agricultura OR agro OR campo) AND "Republica Dominicana"'
+  - id: AGRO.clima_riesgos_y_seguridad_alimentaria
+    nombre: Clima, Riesgos y Seguridad Alimentaria
+    queries:
+    - '(agricultura OR ganaderia OR alimentos) AND (sequia OR lluvias OR plaga OR "peste porcina africana" OR "gripe aviar" OR "seguridad alimentaria" OR "Hambre Cero") AND "Republica Dominicana"'
+- id: MANU
+  nombre: Industria y Manufactura
+  nombre_investigacion: Industria/Manufactura
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: MANU.manufactura_local
+    nombre: Manufactura Local
+    queries:
+    - '(industria OR manufactura OR "industria local" OR "sector industrial" OR "produccion industrial") AND "Republica Dominicana"'
+  - id: MANU.gremios_industriales
+    nombre: Gremios Industriales
+    queries:
+    - '(AIRD OR "Asociacion de Industrias de la Republica Dominicana" OR ADIE OR Proindustria) AND "Republica Dominicana"'
+  - id: MANU.agroindustria_y_alimentos
+    nombre: Agroindustria y Alimentos
+    queries:
+    - '(agroindustria OR "industria de alimentos" OR bebidas OR "ron dominicano" OR cervecera OR "procesamiento de alimentos") AND "Republica Dominicana"'
+  - id: MANU.ramas_industriales
+    nombre: Ramas Industriales
+    queries:
+    - '("industria farmaceutica" OR "industria plastica" OR "industria textil" OR "industria del calzado" OR metalmecanica) AND "Republica Dominicana"'
+  - id: MANU.parques_y_competitividad_industrial
+    nombre: Parques y Competitividad Industrial
+    queries:
+    - '("parques industriales" OR "encadenamiento productivo" OR "exportaciones industriales" OR "valor agregado industrial") AND "Republica Dominicana"'
+- id: ZF
+  nombre: Zonas Francas
+  nombre_investigacion: Zonas Francas
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: ZF.exportaciones_de_zonas_francas
+    nombre: Exportaciones de Zonas Francas
+    queries:
+    - '("zonas francas") AND (exportaciones OR "exportaciones de zonas francas" OR divisas) AND "Republica Dominicana"'
+  - id: ZF.empleo_e_inversion
+    nombre: Empleo e Inversion
+    queries:
+    - '("zonas francas") AND (empleo OR inversion OR "nuevas empresas" OR parques) AND "Republica Dominicana"'
+  - id: ZF.gremio_e_instituciones_adozona_cnzfe
+    nombre: Gremio e Instituciones (ADOZONA / CNZFE)
+    queries:
+    - '(ADOZONA OR "Consejo Nacional de Zonas Francas" OR CNZFE) AND "Republica Dominicana"'
+  - id: ZF.manufactura_avanzada
+    nombre: Manufactura Avanzada
+    queries:
+    - '("dispositivos medicos" OR semiconductores OR farmaceutica OR textil OR "tabaco y cigarros" OR "manufactura avanzada") AND "zonas francas" AND "Republica Dominicana"'
+  - id: ZF.nearshoring_y_comercio
+    nombre: Nearshoring y Comercio
+    queries:
+    - '("zonas francas") AND (nearshoring OR aranceles OR "Estados Unidos" OR competitividad) AND "Republica Dominicana"'
+- id: COM
+  nombre: Comercio y MIPYMES
+  nombre_investigacion: Comercio y MIPYMES
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: COM.comercio_y_ventas
+    nombre: Comercio y Ventas
+    queries:
+    - '("comercio minorista" OR "comercio detallista" OR ventas OR "comercio interno" OR retail OR "grandes superficies") AND "Republica Dominicana"'
+  - id: COM.consumo_de_los_hogares
+    nombre: Consumo de los Hogares
+    queries:
+    - '(consumo OR "consumo privado" OR "gasto de los hogares" OR "mercado interno" OR "demanda interna") AND "Republica Dominicana"'
+  - id: COM.mipymes_y_emprendimiento
+    nombre: MIPYMES y Emprendimiento
+    queries:
+    - '(MIPYMES OR pymes OR "micro empresas" OR "pequenas y medianas empresas" OR emprendimiento OR emprendedores) AND "Republica Dominicana"'
+  - id: COM.instituciones_micm_proconsumidor
+    nombre: Instituciones (MICM / ProConsumidor)
+    queries:
+    - '(MICM OR "Ministerio de Industria, Comercio y Mipymes" OR Promipyme OR "Banca Solidaria" OR ProConsumidor) AND "Republica Dominicana"'
+  - id: COM.financiamiento_y_formalizacion
+    nombre: Financiamiento y Formalizacion
+    queries:
+    - '(MIPYMES OR comercio) AND (credito OR financiamiento OR formalizacion OR informalidad) AND "Republica Dominicana"'
+  - id: COM.comercio_electronico
+    nombre: Comercio Electronico
+    queries:
+    - '("comercio electronico" OR ecommerce OR "pagos digitales" OR delivery OR "tiendas en linea") AND "Republica Dominicana"'
+- id: ENER
+  nombre: Energía y Electricidad
+  nombre_investigacion: Energia y Electricidad
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: ENER.servicio_electrico_y_apagones
+    nombre: Servicio Electrico y Apagones
+    queries:
+    - '(electricidad OR apagones OR "servicio electrico" OR "cortes de luz" OR "sistema electrico nacional" OR SENI) AND "Republica Dominicana"'
+  - id: ENER.distribuidoras_ede
+    nombre: Distribuidoras (EDE)
+    queries:
+    - '(EDE OR Edenorte OR Edesur OR Edeeste OR "distribuidoras de electricidad" OR "perdidas electricas") AND "Republica Dominicana"'
+  - id: ENER.generacion_e_infraestructura
+    nombre: Generacion e Infraestructura
+    queries:
+    - '("Punta Catalina" OR "San Felipe" OR "AES Dominicana" OR ETED OR EGEHID OR CDEEE OR "generacion electrica") AND "Republica Dominicana"'
+  - id: ENER.tarifas_y_subsidio_electrico
+    nombre: Tarifas y Subsidio Electrico
+    queries:
+    - '("tarifa electrica" OR "subsidio electrico" OR "deficit del sector electrico" OR "pliego tarifario" OR "deuda del sector electrico") AND "Republica Dominicana"'
+  - id: ENER.combustibles_y_petroleo
+    nombre: Combustibles y Petroleo
+    queries:
+    - '("precios de los combustibles" OR gasolina OR gasoil OR GLP OR "gas licuado" OR avtur) AND "Republica Dominicana"'
+    - '(petroleo OR OPEP OR brent OR "barril de petroleo" OR Refidomsa) AND "Republica Dominicana"'
+  - id: ENER.renovables_y_transicion
+    nombre: Renovables y Transicion
+    queries:
+    - '("energias renovables" OR solar OR eolica OR "matriz energetica" OR almacenamiento OR BESS OR "transicion energetica" OR "Politica Energetica Nacional 2050") AND "Republica Dominicana"'
+  - id: ENER.regulacion_y_politica_mem_sie_cne
+    nombre: Regulacion y Politica (MEM / SIE / CNE)
+    queries:
+    - '(MEM OR "Ministerio de Energia y Minas" OR SIE OR CNE OR "Superintendencia de Electricidad" OR "pacto electrico") AND "Republica Dominicana"'
+- id: TRANS
+  nombre: Transporte
+  nombre_investigacion: Transporte
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: TRANS.transporte_de_carga_y_fletes
+    nombre: Transporte de Carga y Fletes
+    queries:
+    - '(transporte OR "transporte de carga" OR fletes OR camioneros OR "costos logisticos") AND "Republica Dominicana"'
+  - id: TRANS.transporte_publico_y_gremios
+    nombre: Transporte Publico y Gremios
+    queries:
+    - '(transportistas OR FENATRANO OR CONATRA OR "transporte publico" OR "sindicatos del transporte") AND "Republica Dominicana"'
+  - id: TRANS.logistica_y_puertos
+    nombre: Logistica y Puertos
+    queries:
+    - '(logistica OR puertos OR "puerto Caucedo" OR "puerto de Haina" OR "DP World" OR "carga maritima") AND "Republica Dominicana"'
+  - id: TRANS.aeropuertos_y_carga_aerea
+    nombre: Aeropuertos y Carga Aerea
+    queries:
+    - '(aeropuertos OR AERODOM OR "carga aerea" OR "conectividad aerea") AND "Republica Dominicana"'
+  - id: TRANS.movilidad_e_infraestructura_vial
+    nombre: Movilidad e Infraestructura Vial
+    queries:
+    - '(INTRANT OR "transporte masivo" OR metro OR telecabina OR OMSA OR "movilidad urbana" OR peajes) AND "Republica Dominicana"'
+- id: FIN
+  nombre: Sector Financiero y Banca
+  nombre_investigacion: Sector Financiero / Banca
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: FIN.banca_y_sistema_financiero
+    nombre: Banca y Sistema Financiero
+    queries:
+    - '("sistema financiero" OR banca OR bancos OR "entidades de intermediacion financiera" OR "bancos multiples" OR "asociaciones de ahorros y prestamos") AND "Republica Dominicana"'
+  - id: FIN.bancos_y_entidades
+    nombre: Bancos y Entidades
+    queries:
+    - '(Banreservas OR "Banco Popular" OR "BHD" OR Scotiabank OR Promerica OR APAP OR ADOPEM OR cooperativas) AND "Republica Dominicana"'
+  - id: FIN.credito_y_cartera
+    nombre: Credito y Cartera
+    queries:
+    - '(credito OR prestamos OR "cartera de credito" OR "credito al sector privado") AND "Republica Dominicana"'
+    - '("credito de consumo" OR "credito comercial" OR "credito hipotecario" OR "tarjetas de credito") AND "Republica Dominicana"'
+  - id: FIN.morosidad_y_riesgo_de_credito
+    nombre: Morosidad y Riesgo de Credito
+    queries:
+    - '(morosidad OR "morosidad bancaria" OR "cartera vencida" OR provisiones OR "indice de morosidad" OR "riesgo de credito") AND "Republica Dominicana"'
+  - id: FIN.supervision_y_regulacion
+    nombre: Supervision y Regulacion
+    queries:
+    - '("Superintendencia de Bancos" OR "Junta Monetaria" OR ProUsuario OR "buro de credito" OR "perfil crediticio") AND "Republica Dominicana"'
+  - id: FIN.tasas_y_rentabilidad_bancaria
+    nombre: Tasas y Rentabilidad Bancaria
+    queries:
+    - '("tasas de interes activas" OR "tasas de interes pasivas" OR "margen financiero" OR rentabilidad OR "utilidades de los bancos") AND "Republica Dominicana"'
+  - id: FIN.inclusion_financiera_y_fintech
+    nombre: Inclusion Financiera y Fintech
+    queries:
+    - '("inclusion financiera" OR bancarizacion OR fintech OR ADOFINTECH OR "banca movil" OR "pagos digitales") AND "Republica Dominicana"'
+  - id: FIN.gremio_aba
+    nombre: Gremio (ABA)
+    queries:
+    - '(ABA OR "Asociacion de Bancos Multiples" OR "Asociacion de Bancos") AND "Republica Dominicana"'
+- id: INMO
+  nombre: Inmobiliario y Vivienda
+  nombre_investigacion: Inmobiliario y Vivienda
+  origen: investigacion
+  congelada: true
+  activa_desde: '2016-01-01'
+  subcategorias:
+  - id: INMO.mercado_inmobiliario
+    nombre: Mercado Inmobiliario
+    queries:
+    - '(inmobiliario OR "mercado inmobiliario" OR "bienes raices" OR "sector inmobiliario" OR plusvalia) AND "Republica Dominicana"'
+  - id: INMO.precios_y_demanda_de_vivienda
+    nombre: Precios y Demanda de Vivienda
+    queries:
+    - '("precios de vivienda" OR "demanda de viviendas" OR "deficit habitacional" OR "vivienda de bajo costo") AND "Republica Dominicana"'
+  - id: INMO.hipotecas_y_financiamiento
+    nombre: Hipotecas y Financiamiento
+    queries:
+    - '("prestamos hipotecarios" OR hipotecas OR "tasas hipotecarias" OR "Ley de Fideicomiso" OR "bono vivienda" OR fideicomiso) AND "Republica Dominicana"'
+  - id: INMO.inversion_y_alquiler
+    nombre: Inversion y Alquiler
+    queries:
+    - '("inversion inmobiliaria" OR alquiler OR "renta inmobiliaria" OR Airbnb OR "renta corta") AND "Republica Dominicana"'
+  - id: INMO.desarrollos_y_proyectos
+    nombre: Desarrollos y Proyectos
+    queries:
+    - '("desarrollos inmobiliarios" OR "proyectos residenciales" OR "torres residenciales" OR urbanizaciones) AND "Republica Dominicana"'

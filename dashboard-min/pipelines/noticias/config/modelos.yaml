@@ -1,0 +1,42 @@
+# Registro de modelos de sentimiento. Cada modelo activo puntúa TODAS las
+# noticias (las que coinciden con `idiomas`) y guarda su resultado aparte en
+# puntajes/<id>/ — cambiar o agregar un modelo NUNCA borra los anteriores.
+#
+# tipos soportados:
+#   pysentimiento : create_analyzer(task="sentiment", lang=...)
+#   hf_pipeline   : cualquier modelo de HuggingFace (text-classification)
+#   local         : modelo propio en una carpeta (formato HuggingFace) → `ruta`
+#
+# `mapa`: etiqueta del modelo → POS / NEU / NEG.
+# `max_tokens`: cada modelo trunca según su tokenizer; el texto se trocea en
+#   bloques de ~`bloque_chars` caracteres (titular pesa 2, lede más que el cierre).
+
+modelos:
+  - id: pysentimiento_es
+    nombre: pysentimiento (RoBERTuito, español)
+    tipo: pysentimiento
+    lang: es
+    idiomas: [es]
+    bloque_chars: 450
+    max_bloques: 6
+    activo: true
+    principal: true
+
+  - id: xlmr_multilingue
+    nombre: XLM-RoBERTa multilingüe (cardiffnlp)
+    tipo: hf_pipeline
+    modelo: cardiffnlp/twitter-xlm-roberta-base-sentiment
+    idiomas: [en]          # para noticias en inglés / internacionales
+    mapa: {positive: POS, neutral: NEU, negative: NEG}
+    bloque_chars: 900
+    max_bloques: 4
+    activo: false
+
+  # Ejemplo de modelo propio (cuando exista):
+  # - id: isec_local_v1
+  #   nombre: Modelo ISEC afinado (local)
+  #   tipo: local
+  #   ruta: modelos/isec_local_v1
+  #   idiomas: [es]
+  #   mapa: {LABEL_0: NEG, LABEL_1: NEU, LABEL_2: POS}
+  #   activo: false

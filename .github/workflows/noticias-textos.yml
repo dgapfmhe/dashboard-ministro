@@ -1,0 +1,66 @@
+name: Noticias · cola de textos (histórico)
+
+# Avanza la cola de textos completos del histórico (93k noticias migradas sin
+# texto) con calma: 2 corridas extra al día, en horas distintas al scraper.
+# Cada artículo requiere decodificar su enlace de Google News (2 peticiones lentas).
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 14:00 RD
+    - cron: "0 2 * * *"    # 22:00 RD
+  workflow_dispatch:
+    inputs:
+      minutos:
+        description: "Presupuesto (min)"
+        default: "150"
+
+concurrency:
+  group: noticias
+  cancel-in-progress: false
+
+jobs:
+  textos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    env:
+      NOTICIAS_DIR: ${{ github.workspace }}/datos
+      HF_DATASETS_DISABLE_PROGRESS_BARS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: dgapfmhe/dashboard-noticias
+          ssh-key: ${{ secrets.NOTICIAS_DEPLOY_KEY }}
+          path: datos
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: dashboard-min/pipelines/noticias/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('dashboard-min/pipelines/noticias/config/modelos.yaml') }}
+          restore-keys: hf-
+      - name: Dependencias
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r dashboard-min/pipelines/noticias/requirements.txt
+      - name: Textos
+        continue-on-error: true
+        working-directory: dashboard-min
+        run: python -m pipelines.noticias.scraper textos --minutos ${{ inputs.minutos || '150' }}
+      - name: Checkpoint
+        if: always()
+        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "textos historico $(date -u +%F-%H)"
+      - name: Re-puntuar lo que ganó texto
+        continue-on-error: true
+        working-directory: dashboard-min
+        run: python -m pipelines.noticias.sentimiento --minutos 40
+      - name: Guardar
+        if: always()
+        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "puntajes $(date -u +%F-%H)"
