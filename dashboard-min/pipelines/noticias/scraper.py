@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 import feedparser
 import pandas as pd
 
-from .almacen import Almacen, id_articulo, normalizar, rango_dias
+from .almacen import Almacen, hay, id_articulo, normalizar, rango_dias
 from .config import Config
 from .gnews import TZ_RD, UA, Bloqueado, GoogleNews, dominio
 from . import texto as T
@@ -184,7 +184,7 @@ def textos(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 120,
         for i in idx:
             if (time.time() - t0) / 60 > minutos:
                 break
-            if df.at[i, "url"]:
+            if hay(df.at[i, "url"]):
                 continue
             u = directos.get(normalizar(df.at[i, "titulo"]))
             if not u and decodificar:
@@ -203,7 +203,7 @@ def textos(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 120,
                 res["sin_url"] += 1
 
         # 2) extraer texto de las que ya tienen URL
-        con_url = [i for i in idx if df.at[i, "url"] and df.at[i, "texto_estado"] in ("pendiente", "error")]
+        con_url = [i for i in idx if hay(df.at[i, "url"]) and df.at[i, "texto_estado"] in ("pendiente", "error")]
         if con_url:
             r = T.extraer_lote([df.at[i, "url"] for i in con_url])
             for i in con_url:
@@ -217,7 +217,7 @@ def textos(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 120,
         df["idioma"] = df["idioma"].fillna(df["titulo"].map(T.idioma))
         alm.escribir_dia("articulos", d, df)
         res["dias"] += 1
-        if not decodificar and not any(df.at[i, "url"] for i in idx):
+        if not decodificar and not any(hay(df.at[i, "url"]) for i in idx):
             # sin decodificador ya no podemos avanzar en días sin URL
             break
 

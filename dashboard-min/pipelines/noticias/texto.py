@@ -37,7 +37,7 @@ def extraer(url: str, timeout: int = 25) -> tuple[str, str]:
     """→ (estado, texto). estado ∈ {'ok','vacio','error','sin_texto'}."""
     import trafilatura
 
-    if not url:
+    if not isinstance(url, str) or not url.startswith("http"):
         return "error", ""
     if SIN_TEXTO.search(dominio(url)):
         return "sin_texto", ""

@@ -59,6 +59,12 @@ def id_articulo(titulo: str, medio: str) -> str:
     return hashlib.sha1(f"{normalizar(titulo)}|{normalizar(medio)}".encode()).hexdigest()[:16]
 
 
+def hay(v) -> bool:
+    """True si v es un texto no vacío. Robusto a None y a NaN (pandas 3 lee los
+    textos faltantes como NaN, que en Python es 'verdadero')."""
+    return isinstance(v, str) and v.strip() != ""
+
+
 def ahora() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
@@ -142,7 +148,7 @@ class Almacen:
                 cambio = nuevos_or != orig
                 f["origenes"] = sorted(nuevos_or)
                 for k in ("url", "dominio"):
-                    if not f.get(k) and it.get(k):
+                    if not hay(f.get(k)) and hay(it.get(k)):
                         f[k] = it[k]; cambio = True
                 n_upd += int(cambio)
         if n_new or n_upd:
