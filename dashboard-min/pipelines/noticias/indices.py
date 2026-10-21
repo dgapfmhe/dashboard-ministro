@@ -202,12 +202,11 @@ def isep(ag_d: pd.DataFrame, cfg: Config, modelo: str) -> tuple[pd.DataFrame, pd
                 continue
             mu, th, s2e, s2o = r.params
             nmed = float(t.loc[t["n"] > 0, "n"].median())
-            var_obs = s2o / nmed                       # ruido típico de una observación
-            var_lat = s2e / max(1 - th ** 2, 1e-6)     # varianza estacionaria de la señal
             params.append({
                 "freq": freq, "categoria_id": cat, "modelo_id": modelo, "universo": uni,
                 "mu": float(mu), "theta": float(th), "s2_eta": float(s2e), "s2_eps": float(s2o),
-                "q": float(s2e / s2o), "pct_ruido": float(100 * var_obs / (var_obs + var_lat)),
+                # misma definición que la investigación: q = σ²_nivel/σ²_irregular, % ruido = 1/(1+q)
+                "q": float(s2e / s2o), "pct_ruido": float(100 / (1 + s2e / s2o)),
                 "n_obs": int(len(t)), "n_mediana": nmed, "estimado_en": ahora(),
             })
             fs, ss = r.filtered_state[0], r.smoothed_state[0]
