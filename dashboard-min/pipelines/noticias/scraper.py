@@ -169,7 +169,7 @@ def textos(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 120,
 
     for d in dias:
         if (time.time() - t0) / 60 > minutos:
-            res["abortado"] = "presupuesto de tiempo"
+            res["abortado"] = res["abortado"] or "presupuesto de tiempo"
             break
         df = alm.leer_dia("articulos", d)
         pend = df["texto_estado"].isin(["pendiente", "error"]) & (df["texto_intentos"].fillna(0) < max_intentos)
@@ -222,6 +222,9 @@ def textos(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 120,
             break
 
     res["minutos"] = round((time.time() - t0) / 60, 1)
+    res["peticiones_decod"] = gn.rd.n_peticiones
+    res["bloqueos_decod"] = gn.rd.log[-10:]
+    res["fallos_decod"] = gn.fallos[-10:]
     alm.bitacora({"evento": "textos", **res})
     print(f"[textos] {res}")
     return res

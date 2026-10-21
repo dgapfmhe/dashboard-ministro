@@ -13,8 +13,8 @@ let listo = null
 async function iniciar(version) {
   postMessage({ tipo: 'estado', texto: 'Cargando Python (Pyodide)…' })
   const py = await loadPyodide({ indexURL: PYODIDE })
-  postMessage({ tipo: 'estado', texto: 'Cargando numpy, pandas, scipy y statsmodels…' })
-  await py.loadPackage(['numpy', 'pandas', 'scipy', 'statsmodels'])
+  postMessage({ tipo: 'estado', texto: 'Cargando numpy, pandas, scipy, statsmodels y scikit-learn…' })
+  await py.loadPackage(['numpy', 'pandas', 'scipy', 'statsmodels', 'scikit-learn'])
   postMessage({ tipo: 'estado', texto: 'Cargando el motor del laboratorio…' })
   const codigo = await (await fetch('/lab/laboratorio.py?v=' + encodeURIComponent(version || ''))).text()
   py.FS.writeFile('/home/pyodide/laboratorio.py', codigo)

@@ -7,19 +7,21 @@ import {
 } from './sentimiento'
 
 /* ─── Tipos del payload (espejo de public/lab/laboratorio.py) ──────── */
-export type Transformacion = 'nivel' | 'pct_mm' | 'pct_aa' | 'dif' | 'dif_aa' | 'logdif'
+export type Transformacion = 'nivel' | 'log' | 'pct_mm' | 'pct_aa' | 'dif' | 'dif_aa' | 'logdif'
 export type Agregacion = 'promedio' | 'ultimo' | 'suma'
 export type TipoModelo = 'rw' | 'media' | 'ar' | 'arima' | 'sarimax' | 'arx' | 'var'
+  | 'ridge' | 'lasso' | 'enet' | 'rf' | 'gbr' | 'svr' | 'knn' | 'mlp'
 
 export type SerieIn = { fechas: string[]; valores: (number | null)[] }
 export type ExogIn = SerieIn & {
   id: string; nombre: string; rezago: number; transformacion: Transformacion; agregacion: Agregacion
+  estandarizar?: boolean
 }
 export type ModeloSpec = {
   id: string; tipo: TipoModelo
-  p?: number | 'auto'; d?: number; q?: number; P?: number; D?: number; Q?: number; s?: number
-  pmax?: number; exog?: boolean
+  [k: string]: unknown
 }
+export type Dummy = { tipo: 'impulso' | 'escalon' | 'rango' | 'tendencia'; nombre: string; desde?: string; hasta?: string }
 export type Payload = {
   objetivo: SerieIn & { id: string; agregacion: Agregacion }
   frecuencia: 'M' | 'Q'
@@ -27,6 +29,7 @@ export type Payload = {
   desde: string
   escala_interanual: boolean
   exogenas: ExogIn[]
+  dummies: { estacionales: boolean; lista: Dummy[] }
   modelos: ModeloSpec[]
   backtest: { esquema: 'expanding' | 'rolling'; ventana: number; min_train: number; reestimar_cada: number }
 }
@@ -41,9 +44,11 @@ export type Pronostico = {
 }
 export type ResultadoModelo = {
   id: string; tipo: TipoModelo; nombre: string; benchmark: boolean; error: string | null
+  familia: 'referencia' | 'econometrico' | 'ml'; ecuacion?: string
+  propiedades?: Record<string, unknown>; spec?: Record<string, unknown>
   pronostico?: Pronostico; usa_exog?: boolean
   coef?: { nombre: string; valor: number | null; ee: number | null; p: number | null }[]
-  diagnostico?: { ljung_box_p?: number; jarque_bera_p?: number; arch_p?: number }
+  diagnostico?: { ljung_box_p?: number; jarque_bera_p?: number; arch_p?: number; media_residuos?: number; asimetria?: number; curtosis?: number }
   backtest?: { fechas: string[]; pred: (number | null)[]; real: (number | null)[]; sd: (number | null)[] }
   backtest_interanual?: { fechas: string[]; pred: (number | null)[]; real: (number | null)[] }
   metricas?: Metricas; metricas_interanual?: Metricas
@@ -54,22 +59,25 @@ export type Resultado = {
   serie: { fechas: string[]; y: (number | null)[] }
   exogenas: Record<string, (number | null)[]>
   exog_sig: Record<string, number | null>
+  dummies: string[]
   modelos: ResultadoModelo[]
   avisos: string[]
   interanual: boolean
 }
 
 export const NOMBRE_TRANSF: Record<Transformacion, string> = {
-  nivel: 'Nivel', pct_mm: '% vs período anterior', pct_aa: '% interanual',
+  nivel: 'Nivel', log: 'Logaritmo', pct_mm: '% vs período anterior', pct_aa: '% interanual',
   dif: 'Diferencia', dif_aa: 'Diferencia interanual', logdif: 'Δ log ×100',
 }
 export const NOMBRE_TIPO: Record<TipoModelo, string> = {
   rw: 'Paseo aleatorio', media: 'Media histórica', ar: 'AR(p) automático', arima: 'ARIMA',
   sarimax: 'SARIMAX + exógenas', arx: 'ARX (MCO) + exógenas', var: 'VAR',
+  ridge: 'Ridge', lasso: 'Lasso', enet: 'Elastic Net', rf: 'Random Forest', gbr: 'Gradient Boosting',
+  svr: 'SVR', knn: 'K vecinos', mlp: 'Red neuronal (MLP)',
 }
 
 /* ─── Worker de Pyodide ─────────────────────────────────────────────── */
-const VERSION_MOTOR = '2026-10-21b'
+const VERSION_MOTOR = '2026-10-21c'
 
 export function useMotorPython() {
   const w = useRef<Worker | null>(null)
@@ -84,7 +92,7 @@ export function useMotorPython() {
     const worker = new Worker('/lab/pyodide-worker.js')
     worker.onmessage = (ev: MessageEvent) => {
       const m = ev.data
-      if (m.tipo === 'estado') { setEstado('cargando'); setTexto(m.texto) }
+      if (m.tipo === 'estado') { setEstado(e => (e === 'corriendo' ? e : 'cargando')); setTexto(m.texto) }
       else if (m.tipo === 'listo') { setEstado(e => (e === 'corriendo' ? e : 'listo')); setTexto('') }
       else if (m.tipo === 'progreso') setProgreso({ f: m.f, nombre: m.nombre })
       else if (m.tipo === 'resultado' || m.tipo === 'error') {

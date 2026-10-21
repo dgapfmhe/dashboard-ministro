@@ -75,6 +75,7 @@ class GoogleNews:
         # La decodificación usa otro endpoint; igual va con calma (2 peticiones/artículo).
         self.rd = ritmo_decod or Ritmo(pausa_min=4.0, jitter=3.0)
         self.hl, self.gl, self.ceid = hl, gl, ceid
+        self.fallos: list[str] = []      # diagnóstico de la decodificación
         self.s = requests.Session()
         self.s.headers["User-Agent"] = UA
         self.s.headers["Accept-Language"] = "es-419,es;q=0.9"
@@ -128,6 +129,9 @@ class GoogleNews:
         sg = re.search(r'data-n-a-sg="([^"]+)"', r.text)
         ts = re.search(r'data-n-a-ts="([^"]+)"', r.text)
         if not (sg and ts):
+            self.fallos.append(f"sin firma: HTTP {r.status_code} url={r.url[:80]} len={len(r.text)}")
+            if "consent." in r.url or "sorry" in r.url:
+                self.rd.bloqueo(f"consentimiento/captcha: {r.url[:60]}")
             return None
         req = ["Fbv4je",
                f'["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,'
@@ -147,6 +151,7 @@ class GoogleNews:
             parte = json.loads(r2.text.split("\n\n")[1])[:-2]
             url = json.loads(parte[0][2])[1]
         except Exception:
+            self.fallos.append(f"batchexecute ilegible: HTTP {r2.status_code} {r2.text[:80]!r}")
             return None
         self.rd.ok()
         return url if isinstance(url, str) and url.startswith("http") else None
