@@ -74,7 +74,8 @@ def tabla_articulos(alm: Almacen, modelo: str) -> pd.DataFrame:
     df = et.merge(pu, on="id", how="inner")
     df = df[df["rd"].fillna("?") != "no"]          # fuera lo claramente extranjero
     df["fecha"] = pd.to_datetime(df["fecha"])
-    return df
+    # una nota republicada otro día (mismo titular y medio) cuenta una sola vez: la primera
+    return df.sort_values("fecha").drop_duplicates("id", keep="first").reset_index(drop=True)
 
 
 def _miembros(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
@@ -259,6 +260,7 @@ def _sb():
 def _upsert(sb, tabla: str, df: pd.DataFrame, conflicto: str, lote: int = 1000) -> int:
     if df is None or df.empty:
         return 0
+    df = df.drop_duplicates(subset=[c.strip() for c in conflicto.split(",")], keep="last")
     enteras = {"n", "n_pos", "n_neu", "n_neg", "n_oro", "n_obs", "n_queries", "nivel"}
     recs = df.astype(object).where(df.notna(), None).to_dict("records")
     for r in recs:
@@ -308,6 +310,7 @@ def noticias_recientes(alm: Almacen, cfg: Config, modelo: str) -> pd.DataFrame:
         cs = set(r.cats_query if r.cats_query is not None else []) | set(r.cats_clave if r.cats_clave is not None else [])
         return sorted({c.split(".")[0] for c in cs} & sect)
 
+    df = df.sort_values("fecha").drop_duplicates("id", keep="last")
     df["sectores"] = [sectores(r) for r in df.itertuples(index=False)]
     df = df[df["sectores"].map(len) > 0]
     return pd.DataFrame({

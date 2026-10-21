@@ -77,7 +77,7 @@ export const NOMBRE_TIPO: Record<TipoModelo, string> = {
 }
 
 /* ─── Worker de Pyodide ─────────────────────────────────────────────── */
-const VERSION_MOTOR = '2026-10-21c'
+const VERSION_MOTOR = '2026-10-21d'
 
 export function useMotorPython() {
   const w = useRef<Worker | null>(null)

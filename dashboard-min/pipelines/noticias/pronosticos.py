@@ -118,7 +118,11 @@ def correr(subir: bool = True) -> int:
             continue
 
         fobj = r["fecha_pronostico"]
-        congelar = hoy >= pd.Timestamp(fobj) + pd.DateOffset(months=1)
+        n_bt = next((m.get("metricas", {}).get("n", 0) for m in r["modelos"] if m["id"] == "ar" and not m["error"]), 0)
+        # Congelar solo con el mes objetivo cerrado Y historia suficiente (≥ 24 evaluaciones fuera de muestra)
+        congelar = hoy >= pd.Timestamp(fobj) + pd.DateOffset(months=1) and n_bt >= 24
+        if not congelar and n_bt < 24:
+            print(f"  {spec['id']}: backtest con {n_bt} evaluaciones (< 24) — se publica el nowcast pero no se congela")
         filas_now, filas_met = [], []
         for m in r["modelos"]:
             if m["error"] or not m.get("pronostico"):

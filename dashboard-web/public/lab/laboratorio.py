@@ -140,6 +140,22 @@ def preparar(p: dict):
                 X_sig[n] = ultimo.iloc[-1]
                 avisos.append(f"«{n}» aún no tiene dato para {fecha_sig:%Y-%m}: se usa su último valor (persistencia).")
 
+    # Exógena sin dato en los últimos períodos de y (p. ej. hueco de noticias): se
+    # rellena con su último valor solo si faltan ≤ 3 períodos; si no, la muestra
+    # terminaría antes que y y el "t+1" sería engañoso → error explícito.
+    for n in nombres:
+        ult_x = df[n].loc[:ult_y].last_valid_index()
+        if ult_x is None or ult_x >= ult_y:
+            continue
+        faltan = len(df.loc[ult_x:ult_y]) - 1
+        if faltan <= 3:
+            df.loc[ult_x:ult_y, n] = df.loc[ult_x:ult_y, n].ffill()
+            avisos.append(f"«{n}» no tiene dato en los últimos {faltan} período(s) de la variable objetivo "
+                          f"(hasta {ult_y:%Y-%m}): se rellenan con su último valor ({ult_x:%Y-%m}).")
+        else:
+            raise ValueError(f"«{n}» termina en {ult_x:%Y-%m} pero la variable objetivo llega a {ult_y:%Y-%m} "
+                             f"({faltan} períodos sin dato). Hay un hueco en la serie: usa otra exógena, "
+                             f"un rezago mayor o espera a que se complete.")
     muestra = df.loc[:ult_y].dropna()
     if len(muestra) < 24:
         rangos = []

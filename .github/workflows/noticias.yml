@@ -92,6 +92,12 @@ jobs:
         working-directory: dashboard-min
         run: python -m pipelines.noticias.scraper categorias-nuevas --minutos 30
 
+      - name: 2b · Relleno de huecos sin noticias (semana a semana, reanudable)
+        if: ${{ !inputs.omitir_scraper }}
+        continue-on-error: true
+        working-directory: dashboard-min
+        run: python -m pipelines.noticias.scraper rellenar --minutos 60
+
       - name: 3 · Textos completos (cola)
         continue-on-error: true
         working-directory: dashboard-min
@@ -117,6 +123,7 @@ jobs:
           python -m pipelines.noticias.indices $ARGS
 
       - name: 6 · Pronósticos oficiales (laboratorio) → Supabase
+        if: always()
         continue-on-error: true
         working-directory: dashboard-min
         env:
