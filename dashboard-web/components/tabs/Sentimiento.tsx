@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ComposedChart, Line, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, ReferenceArea,
 } from 'recharts'
 import ChartWrapper from '@/components/charts/ChartWrapper'
 import { C } from '@/lib/colors'
@@ -12,7 +12,7 @@ import {
   type LatenteParam, type Noticia, type Pesos,
   fetchCategorias, fetchModelos, fetchAgregado, fetchLatente, fetchLatenteParams,
   fetchMarkov, fetchNoticias, calcularISEC, desdeDefecto, PESOS_BASE, NOMBRE_FREQ,
-  ISSUE_NUEVA_CATEGORIA, rejilla,
+  ISSUE_NUEVA_CATEGORIA, rejilla, fechaLarga, tramosSinDatos,
 } from '@/lib/sentimiento'
 
 /* Pestaña de sentimiento de prensa:
@@ -97,12 +97,16 @@ export default function Sentimiento() {
           isep: r4(v),
           banda: v != null && se != null ? [r4(v - 1.96 * se), r4(v + 1.96 * se)] : null,
           sps: r4(p.sps),
-          n: p.n,
+          n: p.n, pos: p.pos, neu: p.neu, neg: p.neg,
           p_estres: M.has(p.fecha) ? r4(M.get(p.fecha)!) : null,
         }
       })
   }, [isec, lat, mk, rango, variante])
 
+  const huecos = useMemo(() => tramosSinDatos(serie), [serie])
+  const sombraHuecos = huecos.map(([a, b]) => (
+    <ReferenceArea key={a} x1={a} x2={b} fill="#FEE2E2" fillOpacity={0.7} stroke="none" ifOverflow="extendDomain" />
+  ))
   const ultimo = useMemo(() => {
     for (let i = serie.length - 1; i >= 0; i--) if (serie[i].isep != null || serie[i].isec != null) return serie[i]
     return null
@@ -182,7 +186,8 @@ export default function Sentimiento() {
             <CartesianGrid stroke={C.gridStroke} vertical={false} />
             <XAxis dataKey="fecha" tickFormatter={xFmt} tick={{ fontSize: 10, fill: C.axisStroke }} minTickGap={40} />
             <YAxis tick={{ fontSize: 10, fill: C.axisStroke }} width={48} domain={['auto', 'auto']} tickFormatter={v => Number(v).toFixed(2)} />
-            <Tooltip content={<TipSent fmt={xFmt} />} />
+            <Tooltip content={<TipDia freq={freq} />} />
+            {sombraHuecos}
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="#CBD5E0" />
             <Area dataKey="banda" name="Banda 95% ISEP" stroke="none" fill={C.red} fillOpacity={0.12} isAnimationActive={false} connectNulls />
@@ -195,7 +200,7 @@ export default function Sentimiento() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ── volumen ── */}
-        <ChartWrapper title="Volumen de noticias" subtitle={`${nombreCat(cat)} · noticias por período (base de ATM)`}
+        <ChartWrapper title="Volumen y tono de las noticias" subtitle={`${nombreCat(cat)} · positivas / neutras / negativas por período · rojo claro = sin noticias registradas`}
                       from={rango[0]} to={rango[1]} dataMin={dataMin} onRangeChange={(f, t) => setRango([f, t])}
                       isLoading={loading} height={240} downloadName={`volumen_${cat}_${freq}`}>
           <ResponsiveContainer width="100%" height="100%">
@@ -203,8 +208,12 @@ export default function Sentimiento() {
               <CartesianGrid stroke={C.gridStroke} vertical={false} />
               <XAxis dataKey="fecha" tickFormatter={xFmt} tick={{ fontSize: 10, fill: C.axisStroke }} minTickGap={40} />
               <YAxis tick={{ fontSize: 10, fill: C.axisStroke }} width={44} />
-              <Tooltip labelFormatter={l => xFmt(String(l))} />
-              <Bar dataKey="n" name="Noticias" fill={C.lightBlue} isAnimationActive={false} />
+              <Tooltip content={<TipDia freq={freq} />} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              {sombraHuecos}
+              <Bar dataKey="neg" name="Negativas" stackId="v" fill={C.red} isAnimationActive={false} />
+              <Bar dataKey="neu" name="Neutras" stackId="v" fill="#A0AEC0" isAnimationActive={false} />
+              <Bar dataKey="pos" name="Positivas" stackId="v" fill={C.green} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </ChartWrapper>
@@ -221,7 +230,7 @@ export default function Sentimiento() {
               <CartesianGrid stroke={C.gridStroke} vertical={false} />
               <XAxis dataKey="fecha" tickFormatter={xFmt} tick={{ fontSize: 10, fill: C.axisStroke }} minTickGap={40} />
               <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: C.axisStroke }} width={36} tickFormatter={v => `${Math.round(v * 100)}%`} />
-              <Tooltip labelFormatter={l => xFmt(String(l))} formatter={(v) => `${Math.round(Number(v) * 100)}%`} />
+              <Tooltip content={<TipDia freq={freq} />} />
               <ReferenceLine y={0.7} stroke={C.red} strokeDasharray="4 3" />
               <Area dataKey="p_estres" name="P(estrés)" stroke={C.red} fill={C.red} fillOpacity={0.35} isAnimationActive={false} />
             </ComposedChart>
@@ -415,19 +424,37 @@ function Pol({ v }: { v: number }) {
   const c = v > 0.15 ? C.green : v < -0.15 ? C.red : C.gray
   return <span className="shrink-0 w-12 text-right tabular-nums font-semibold" style={{ color: c }}>{v > 0 ? '+' : ''}{v.toFixed(2)}</span>
 }
-function TipSent({ active, payload, label, fmt }: {
-  active?: boolean; payload?: { name: string; value: number | number[]; color: string; dataKey: string }[]; label?: string; fmt: (v: string) => string
-}) {
+/* Tooltip por período: fecha completa, cantidad de noticias, desglose por tono e índices. */
+type PuntoSerie = {
+  fecha: string; n: number; pos: number; neu: number; neg: number
+  sps: number | null; isec: number | null; isep: number | null; banda: (number | null)[] | null; p_estres: number | null
+}
+function TipDia({ active, payload, freq }: { active?: boolean; payload?: { payload: PuntoSerie }[]; freq: Freq }) {
   if (!active || !payload?.length) return null
-  const n = (payload[0] as unknown as { payload: { n: number } }).payload?.n
+  const p = payload[0].payload
+  const pc = (x: number) => (p.n ? ` (${Math.round(100 * x / p.n)}%)` : '')
+  const f = (v: number | null | undefined) => (v == null ? '—' : v.toFixed(3))
   return (
-    <div className="bg-[#1A202C] text-white text-[11px] px-3 py-2 rounded-lg shadow-lg">
-      <p className="font-medium mb-1">{fmt(String(label))} · {n ?? 0} noticias</p>
-      {payload.filter(p => p.dataKey !== 'banda' && p.value != null).map(p => (
-        <p key={p.dataKey} style={{ color: p.color === '#A0AEC0' ? '#CBD5E0' : p.color }}>
-          {p.name}: {(p.value as number).toFixed(3)}
-        </p>
-      ))}
+    <div className="bg-[#1A202C] text-white text-[11px] px-3 py-2 rounded-lg shadow-lg min-w-[220px]">
+      <p className="font-semibold mb-1 first-letter:uppercase">{fechaLarga(p.fecha, freq)}</p>
+      {p.n === 0 ? (
+        <p className="text-red-300">Sin noticias registradas en este período (hueco de datos).</p>
+      ) : (
+        <>
+          <p className="mb-1"><b>{p.n.toLocaleString('es-DO')}</b> noticias</p>
+          <div className="grid grid-cols-[1fr_auto] gap-x-3 tabular-nums">
+            <span className="text-green-300">Positivas</span><span>{p.pos}{pc(p.pos)}</span>
+            <span className="text-gray-300">Neutras</span><span>{p.neu}{pc(p.neu)}</span>
+            <span className="text-red-300">Negativas</span><span>{p.neg}{pc(p.neg)}</span>
+          </div>
+          <div className="border-t border-white/15 mt-1.5 pt-1.5 grid grid-cols-[1fr_auto] gap-x-3 tabular-nums">
+            <span className="text-gray-300">Sentimiento medio (SPS)</span><span>{f(p.sps)}</span>
+            <span style={{ color: '#9DB7D5' }}>ISEC</span><span>{f(p.isec)}</span>
+            <span style={{ color: '#F2A7A7' }}>ISEP{p.banda?.[0] != null ? ` [${f(p.banda[0])}; ${f(p.banda[1])}]` : ''}</span><span>{f(p.isep)}</span>
+            {p.p_estres != null && <><span className="text-amber-300">P(estrés)</span><span>{Math.round(p.p_estres * 100)}%</span></>}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -73,7 +73,8 @@ class GoogleNews:
                  hl: str = "es-419", gl: str = "DO", ceid: str = "DO:es-419"):
         self.rb = ritmo_busqueda or Ritmo()
         # La decodificación usa otro endpoint; igual va con calma (2 peticiones/artículo).
-        self.rd = ritmo_decod or Ritmo(pausa_min=4.0, jitter=3.0)
+        # (0 bloqueos en >6.000 peticiones con 4+U(0,3) s → se acorta con margen)
+        self.rd = ritmo_decod or Ritmo(pausa_min=3.0, jitter=2.0)
         self.hl, self.gl, self.ceid = hl, gl, ceid
         self.fallos: list[str] = []      # diagnóstico de la decodificación
         self.s = requests.Session()

@@ -116,7 +116,8 @@ export const PESOS_BASE: Pesos = { sps: 0.7, atm: 0.1, idm: 0.1, vs: 0.1 }
 export const VENTANA: Record<Freq, number> = { D: 365, W: 52, M: 12 }
 
 export type PuntoISEC = {
-  fecha: string; n: number; sps: number | null; lnatm: number | null
+  fecha: string; n: number; pos: number; neu: number; neg: number
+  sps: number | null; lnatm: number | null
   idm: number | null; vs: number | null; isec: number | null
 }
 
@@ -154,7 +155,7 @@ export function calcularISEC(ag: Agregado[], f: Freq, w: Pesos, hasta?: string):
     const vs = winS.length >= Math.max(3, Math.ceil(minObs / 2)) ? -desv(winS) : null
     const isec = sps !== null && lnatm !== null && idm !== null && vs !== null
       ? w.sps * sps + w.atm * lnatm + w.idm * idm + w.vs * vs : null
-    out.push({ fecha: fe, n, sps, lnatm, idm, vs, isec })
+    out.push({ fecha: fe, n, pos: a?.n_pos ?? 0, neu: a?.n_neu ?? 0, neg: a?.n_neg ?? 0, sps, lnatm, idm, vs, isec })
   }
   return out
 }
@@ -169,5 +170,32 @@ export function desdeDefecto(f: Freq): string {
 }
 
 export const NOMBRE_FREQ: Record<Freq, string> = { D: 'Diaria', W: 'Semanal', M: 'Mensual' }
+
+const _DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const _MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+/** Etiqueta larga del período para el tooltip: "martes 14 de octubre de 2026", "semana del 13 al 19 oct 2026", "octubre 2026". */
+export function fechaLarga(fecha: string, f: Freq): string {
+  const d = new Date(fecha.slice(0, 10) + 'T00:00:00Z')
+  if (isNaN(d.getTime())) return fecha
+  const dia = d.getUTCDate(), mes = _MESES[d.getUTCMonth()], an = d.getUTCFullYear()
+  if (f === 'D') return `${_DIAS[d.getUTCDay()]} ${dia} de ${mes} de ${an}`
+  if (f === 'W') {
+    const fin = new Date(d); fin.setUTCDate(fin.getUTCDate() + 6)
+    return `semana del ${dia} ${mes.slice(0, 3)} al ${fin.getUTCDate()} ${_MESES[fin.getUTCMonth()].slice(0, 3)} ${fin.getUTCFullYear()}`
+  }
+  return `${mes} ${an}`
+}
+
+/** Tramos consecutivos sin noticias (n = 0) → para sombrearlos como "sin datos". */
+export function tramosSinDatos(serie: { fecha: string; n: number }[]): [string, string][] {
+  const out: [string, string][] = []
+  let ini: string | null = null, prev: string | null = null
+  for (const p of serie) {
+    if (p.n === 0) { ini ??= p.fecha; prev = p.fecha }
+    else if (ini) { out.push([ini, prev!]); ini = null }
+  }
+  if (ini) out.push([ini, prev!])
+  return out
+}
 export const ISSUE_NUEVA_CATEGORIA =
   'https://github.com/dgapfmhe/dashboard-ministro/issues/new?template=nueva_categoria.yml'

@@ -1,31 +1,27 @@
-name: Noticias · scraper diario + sentimiento + ISEC/ISEP
+name: Noticias · ciclo autónomo (scraper diario, relleno, textos, sentimiento, ISEC/ISEP)
 
-# 06:00 RD (10:00 UTC), todos los días:
-#   1) scrapea t-1 (categorías + barrido general) y re-barre t-3 (lo publicado tarde)
-#   2) backfill de categorías nuevas (si las hay)
-#   3) cola de textos: URL original + texto completo
-#   4) sentimiento (modelos activos) y 5) índices → Supabase
-# Los datos (Parquet con texto íntegro) se guardan en el repo PRIVADO
-# dgapfmhe/dashboard-noticias, nunca en este repo público.
+# Corre cada 3 horas y hace lo pendiente por prioridad (pipelines/noticias/ciclo.py):
+#   1) diario t-1 (desde las 05:00 RD; recupera días atrasados)  2) categorías nuevas
+#   3) auditoría de cobertura  4) relleno profundo de huecos  5) textos completos
+#   6) profundizar histórico  7) sentimiento  8) índices + pronósticos → Supabase
+# Cada corrida es idéntica ("haz lo que falte"): si GitHub cancela o retrasa una,
+# la siguiente la cubre. Checkpoint al repo privado de datos tras cada paso.
+# Los datos (Parquet con texto íntegro) viven en el repo PRIVADO dgapfmhe/dashboard-noticias.
 
 on:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "15 */3 * * *"
   workflow_dispatch:
     inputs:
+      minutos:
+        description: "Presupuesto de trabajo (min)"
+        required: false
+        default: "165"
       dia:
-        description: "Día a scrapear (AAAA-MM-DD). Vacío = ayer (hora RD)"
+        description: "Forzar scraper diario de un día (AAAA-MM-DD). Vacío = automático"
         required: false
-      minutos_textos:
-        description: "Presupuesto (min) para la cola de textos"
-        required: false
-        default: "120"
       indices_completo:
         description: "Re-subir todos los índices (tras cambiar categorías/modelos)"
-        type: boolean
-        default: false
-      omitir_scraper:
-        description: "Saltar el scraper (solo textos, sentimiento, índices y pronósticos)"
         type: boolean
         default: false
 
@@ -34,9 +30,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  diario:
+  ciclo:
     runs-on: ubuntu-latest
-    timeout-minutes: 345
+    timeout-minutes: 205
     permissions:
       contents: read
     env:
@@ -72,70 +68,24 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r dashboard-min/pipelines/noticias/requirements.txt
 
-      - name: 1 · Scraper diario (t-1 + re-barrido t-3 + barrido general)
-        id: scraper
-        if: ${{ !inputs.omitir_scraper }}
-        continue-on-error: true
-        working-directory: dashboard-min
-        run: |
-          ARGS=""
-          if [ -n "${{ inputs.dia }}" ]; then ARGS="--dia ${{ inputs.dia }}"; fi
-          python -m pipelines.noticias.scraper diario $ARGS
-
-      - name: Checkpoint datos
-        if: always()
-        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "scraper diario $(date -u +%F)"
-
-      - name: 2 · Backfill de categorías nuevas
-        if: ${{ !inputs.omitir_scraper }}
-        continue-on-error: true
-        working-directory: dashboard-min
-        run: python -m pipelines.noticias.scraper categorias-nuevas --minutos 30
-
-      - name: 2b · Relleno de huecos sin noticias (semana a semana, reanudable)
-        if: ${{ !inputs.omitir_scraper }}
-        continue-on-error: true
-        working-directory: dashboard-min
-        run: python -m pipelines.noticias.scraper rellenar --minutos 60
-
-      - name: 3 · Textos completos (cola)
-        continue-on-error: true
-        working-directory: dashboard-min
-        run: python -m pipelines.noticias.scraper textos --minutos ${{ inputs.minutos_textos || '120' }}
-
-      - name: Checkpoint datos
-        if: always()
-        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "textos $(date -u +%F)"
-
-      - name: 4 · Sentimiento
-        continue-on-error: true
-        working-directory: dashboard-min
-        run: python -m pipelines.noticias.sentimiento --minutos 50
-
-      - name: 5 · Índices → Supabase
+      - name: Ciclo
         working-directory: dashboard-min
         env:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          ARGS=""
-          if [ "${{ inputs.indices_completo }}" = "true" ]; then ARGS="--completo"; fi
-          python -m pipelines.noticias.indices $ARGS
+          ARGS="--minutos ${{ inputs.minutos || '165' }}"
+          if [ -n "${{ inputs.dia }}" ]; then ARGS="$ARGS --dia ${{ inputs.dia }}"; fi
+          if [ "${{ inputs.indices_completo }}" = "true" ]; then ARGS="$ARGS --indices-completo"; fi
+          python -m pipelines.noticias.ciclo $ARGS
 
-      - name: 6 · Pronósticos oficiales (laboratorio) → Supabase
+      - name: Guardar datos (por si el ciclo se cortó)
         if: always()
-        continue-on-error: true
-        working-directory: dashboard-min
-        env:
-          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python -m pipelines.noticias.pronosticos
-
-      - name: Guardar datos
-        if: always()
-        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "sentimiento + indices $(date -u +%F)"
+        run: bash dashboard-min/pipelines/noticias/guardar_datos.sh datos "ciclo $(date -u +%F-%H)"
 
       - name: Resumen
         if: always()
         working-directory: dashboard-min
-        run: python -m pipelines.noticias.scraper estado | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          python -m pipelines.noticias.scraper estado | tee -a "$GITHUB_STEP_SUMMARY"
+          python -m pipelines.noticias.relleno estado | tee -a "$GITHUB_STEP_SUMMARY"

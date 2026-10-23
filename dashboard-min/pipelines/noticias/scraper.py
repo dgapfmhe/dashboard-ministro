@@ -3,7 +3,6 @@
     python -m pipelines.noticias.scraper diario                 # t-1 + re-barrido t-3 + barrido general
     python -m pipelines.noticias.scraper diario --dia 2026-10-20
     python -m pipelines.noticias.scraper categorias-nuevas      # backfill de categorías recién agregadas
-    python -m pipelines.noticias.scraper rellenar --minutos 60  # huecos sin noticias (detecta solo), semana a semana
     python -m pipelines.noticias.scraper textos --minutos 120   # URL original + texto completo (cola)
     python -m pipelines.noticias.scraper estado
 
@@ -77,6 +76,10 @@ def diario(alm: Almacen, cfg: Config, gn: GoogleNews, dia: date | None = None,
             for i, (cat, q) in enumerate(tareas, 1):
                 items = gn.buscar(q, a, b)
                 res["consultas"] += 1
+                if len(items) >= SATURA and b > a:      # Google truncó en 100 → por días
+                    for d in rango_dias(a, b):
+                        items += gn.buscar(q, d, d)
+                        res["consultas"] += 1
                 n, u = _guardar(alm, _items_a_filas(items, f"q:{cat}"))
                 res["nuevos"] += n; res["actualizados"] += u
                 if i % 20 == 0:
@@ -136,71 +139,6 @@ def categorias_nuevas(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float 
         print(f"[categorias-nuevas] pausa: {type(e).__name__}")
     alm.bitacora({"evento": "categorias_nuevas", "semanas": hechos})
     return {"semanas": hechos, "progreso": prog}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# RELLENO DE HUECOS (p. ej. jul–oct 2026, cuando no corrió ningún scraper)
-# ══════════════════════════════════════════════════════════════════════════════
-def detectar_huecos(alm: Almacen, min_dias: int = 4, ventana_dias: int = 400) -> list[tuple[date, date]]:
-    """Rangos de días SIN ningún archivo de noticias dentro del último año."""
-    hoy = hoy_rd()
-    existentes = set(alm.dias("articulos"))
-    huecos, ini = [], None
-    for d in rango_dias(hoy - timedelta(days=ventana_dias), hoy - timedelta(days=2)):
-        if d not in existentes:
-            ini = ini or d
-        elif ini:
-            if (d - ini).days >= min_dias:
-                huecos.append((ini, d - timedelta(days=1)))
-            ini = None
-    return huecos
-
-
-def rellenar(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 60,
-             desde: date | None = None, hasta: date | None = None) -> dict:
-    """Recorre los huecos semana a semana (lo más reciente primero) con las búsquedas de
-    las categorías. Reanudable a nivel de consulta (estado/relleno.json)."""
-    t0 = time.time()
-    plan = alm.estado("relleno", None)
-    if desde and hasta:
-        plan = {"rangos": [[str(desde), str(hasta)]], "cursor": None, "i": 0}
-    if not plan or not plan.get("rangos"):
-        huecos = detectar_huecos(alm)
-        if not huecos:
-            print("[rellenar] no hay huecos"); return {"pendiente": False}
-        plan = {"rangos": [[str(a), str(b)] for a, b in huecos], "cursor": None, "i": 0}
-        print(f"[rellenar] huecos detectados: {plan['rangos']}")
-    res = {"consultas": 0, "nuevos": 0, "abortado": None}
-    try:
-        while plan["rangos"]:
-            a0, b0 = (date.fromisoformat(x) for x in plan["rangos"][0])
-            cursor = date.fromisoformat(plan["cursor"]) if plan.get("cursor") else b0
-            while cursor >= a0:
-                a = max(a0, cursor - timedelta(days=6))
-                tareas = cfg.tareas_query(cursor)
-                while plan["i"] < len(tareas):
-                    if (time.time() - t0) / 60 > minutos:
-                        raise TimeoutError
-                    cat, q = tareas[plan["i"]]
-                    n, _ = _guardar(alm, _items_a_filas(gn.buscar(q, a, cursor), f"q:{cat}"))
-                    res["consultas"] += 1; res["nuevos"] += n
-                    plan["i"] += 1
-                    if plan["i"] % 25 == 0:
-                        plan["cursor"] = str(cursor); alm.guardar_estado("relleno", plan)
-                print(f"  [rellenar] semana {a}→{cursor}: total nuevos {res['nuevos']}", flush=True)
-                cursor = a - timedelta(days=1)
-                plan["cursor"], plan["i"] = str(cursor), 0
-                alm.guardar_estado("relleno", plan)
-            plan["rangos"].pop(0); plan["cursor"], plan["i"] = None, 0
-            alm.guardar_estado("relleno", plan)
-    except (Bloqueado, TimeoutError) as e:
-        res["abortado"] = type(e).__name__
-        alm.guardar_estado("relleno", plan)
-    res["pendiente"] = bool(plan["rangos"])
-    res["minutos"] = round((time.time() - t0) / 60, 1)
-    alm.bitacora({"evento": "rellenar", **res, "plan": plan})
-    print(f"[rellenar] {res}")
-    return res
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -308,7 +246,7 @@ def estado(alm: Almacen) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["diario", "categorias-nuevas", "rellenar", "textos", "estado"])
+    ap.add_argument("cmd", choices=["diario", "categorias-nuevas", "textos", "estado"])
     ap.add_argument("--dir", default=None, help="carpeta del repo de datos (NOTICIAS_DIR)")
     ap.add_argument("--dia", default=None)
     ap.add_argument("--rebarrido", type=int, default=3)
@@ -326,10 +264,6 @@ def main(argv=None) -> int:
         return 0 if r["consultas"] else 1
     if a.cmd == "categorias-nuevas":
         categorias_nuevas(alm, cfg, gn, a.minutos)
-    elif a.cmd == "rellenar":
-        rellenar(alm, cfg, gn, a.minutos,
-                 date.fromisoformat(a.desde) if a.desde else None,
-                 date.fromisoformat(a.hasta) if a.hasta else None)
     elif a.cmd == "textos":
         textos(alm, cfg, gn, a.minutos,
                date.fromisoformat(a.desde) if a.desde else None,
