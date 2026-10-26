@@ -6,9 +6,9 @@ cancela o retrasa una, la siguiente la cubre.
   1. diario       t-1 (y días atrasados, máx. 5) desde las 05:00 RD · re-barrido t-3
   2. categorías   backfill de categorías nuevas
   3. auditoría    días débiles del último año → cola de relleno (sin Google, 1×/día)
-  4. relleno      huecos y días débiles: búsqueda adaptativa + barrido día a día
+  4. relleno      cola de días (huecos, pedidos, días débiles): categorías con ventana de 1 día + barrido
   5. textos       URL original + texto completo (cola, lo reciente primero)
-  6. profundizar  histórico 2016→jul-2026 con búsqueda adaptativa (cuando no hay relleno)
+  6. profundizar  histórico 2016→jul-2026 día por día (cuando la cola de relleno está vacía)
   7. sentimiento  modelos activos sobre lo nuevo / lo que ganó texto
   8. índices + pronósticos oficiales → Supabase
 
@@ -93,10 +93,10 @@ def correr(minutos: float = 165, guardar: bool = True, dia_forzado: date | None 
         alm.guardar_estado("ciclo", est)
 
     # 4) relleno profundo
-    plan = alm.estado("relleno_profundo", {"ventanas": []})
-    if plan["ventanas"] and google_ok() and reloj.libre() > 10:
+    if R._cargar_plan(alm)["dias"] and google_ok() and reloj.libre() > 10:
         r = R.relleno(alm, cfg, gn, reloj.libre() * 0.6)
-        resumen["relleno"] = {k: r[k] for k in ("consultas", "nuevos", "ventanas_completas", "pendientes", "abortado")}
+        resumen["relleno"] = {"consultas": r["consultas"], "nuevos": r["nuevos"], "dias": r["dias_completos"],
+                               "pendientes": r["pendientes"], "abortado": r["abortado"]}
         checkpoint("relleno profundo")
 
     # 5) textos completos
@@ -106,10 +106,9 @@ def correr(minutos: float = 165, guardar: bool = True, dia_forzado: date | None 
         checkpoint("textos")
 
     # 6) profundizar histórico (solo si no hay relleno pendiente)
-    plan = alm.estado("relleno_profundo", {"ventanas": []})
-    if not plan["ventanas"] and google_ok() and reloj.libre() > 10:
+    if not R._cargar_plan(alm)["dias"] and google_ok() and reloj.libre() > 10:
         r = R.profundizar(alm, cfg, gn, reloj.libre() * 0.8)
-        resumen["profundizar"] = {k: r.get(k) for k in ("consultas", "nuevos", "semanas", "cursor")}
+        resumen["profundizar"] = {k: r.get(k) for k in ("consultas", "nuevos", "dias", "cursor")}
         checkpoint("profundizar historico")
 
     # 7) sentimiento
