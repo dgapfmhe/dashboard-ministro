@@ -17,7 +17,9 @@ from pathlib import Path
 
 from ..almacen import Almacen, rango_dias
 from ..config import Config
-from ..gnews import GoogleNews
+import time
+
+from ..gnews import GoogleNews, esperar_conexion
 from .. import relleno as R
 from .. import sentimiento as SE
 
@@ -37,8 +39,15 @@ def main() -> None:
     objetivo = {str(d) for d in rango_dias(date.fromisoformat(a.desde), date.fromisoformat(a.hasta))}
     alm, cfg = Almacen(), Config()
     gn = GoogleNews()
+    pausas = 0
     while True:
-        r = R.relleno(alm, cfg, gn, a.tramo, hasta_vaciar=objetivo)
+        esperar_conexion(max_horas=12)
+        try:
+            r = R.relleno(alm, cfg, gn, a.tramo, hasta_vaciar=objetivo)
+        except Exception as e:                      # p. ej. SinRed: la red no volvió
+            print(f"[local] {type(e).__name__}: {e} → reintento en 10 min", flush=True)
+            time.sleep(600)
+            continue
         SE.puntuar_pendientes(alm, cfg, minutos=10, desde=date(2026, 7, 9))
         if os.environ.get("SUPABASE_URL"):
             try:
@@ -49,8 +58,18 @@ def main() -> None:
         guardar(alm, f"backfill local {', '.join(r['dias_completos'][-3:]) or 'parcial'}")
         quedan = [u["d"] for u in R._cargar_plan(alm)["dias"] if u["d"] in objetivo]
         print(f"[local] quedan {len(quedan)} días del rango pedido", flush=True)
-        if not quedan or r["abortado"] == "Bloqueado":
+        if not quedan:
             break
+        if r["abortado"] == "Bloqueado":                # bloqueo REAL de Google
+            pausas += 1
+            if pausas > 4:
+                print("[local] Google sigue bloqueando tras 4 pausas: me detengo", flush=True)
+                break
+            print(f"[local] Google bloqueó → pausa de 45 min ({pausas}/4)", flush=True)
+            time.sleep(45 * 60)
+            gn = GoogleNews()                           # reinicia el disyuntor
+        else:
+            pausas = 0
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ import pandas as pd
 
 from .almacen import Almacen, rango_dias
 from .config import Config
-from .gnews import Bloqueado, GoogleNews
+from .gnews import Bloqueado, GoogleNews, SinRed
 from .scraper import SATURA, _guardar, _items_a_filas, hoy_rd
 
 INICIO_HISTORICO = date(2016, 1, 1)
@@ -130,7 +130,7 @@ def relleno(alm: Almacen, cfg: Config, gn: GoogleNews, minutos: float = 60,
             res["dias_completos"].append(u["d"])
             alm.guardar_estado(PLAN, plan)
             print(f"  [relleno] {u['d']} completo (+{nuevos_dia}) · quedan {len(plan['dias'])} días", flush=True)
-    except (Bloqueado, TimeoutError) as e:
+    except (Bloqueado, TimeoutError, SinRed) as e:
         res["abortado"] = type(e).__name__
         alm.guardar_estado(PLAN, plan)
     res["pendientes"] = len(plan["dias"])

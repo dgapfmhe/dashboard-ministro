@@ -68,6 +68,30 @@ class Ritmo:
         time.sleep(espera)
 
 
+def esperar_conexion(max_horas: float = 6.0) -> bool:
+    """Caída de internet ≠ bloqueo de Google: espera a que vuelva la red (prueba cada
+    60 s hasta `max_horas`). → True si volvió."""
+    import socket
+    t0 = time.time()
+    avisado = False
+    while time.time() - t0 < max_horas * 3600:
+        try:
+            socket.create_connection(("news.google.com", 443), timeout=10).close()
+            if avisado:
+                print(f"  [red] conexión restablecida tras {round((time.time() - t0) / 60)} min", flush=True)
+            return True
+        except OSError:
+            if not avisado:
+                print("  [red] sin conexión a internet → espero a que vuelva…", flush=True)
+                avisado = True
+            time.sleep(60)
+    return False
+
+
+class SinRed(RuntimeError):
+    """La red no volvió en el tiempo máximo de espera."""
+
+
 class GoogleNews:
     def __init__(self, ritmo_busqueda: Ritmo | None = None, ritmo_decod: Ritmo | None = None,
                  hl: str = "es-419", gl: str = "DO", ceid: str = "DO:es-419"):
@@ -92,6 +116,10 @@ class GoogleNews:
             try:
                 r = self.s.get(url, timeout=30)
             except requests.RequestException as e:
+                if isinstance(e, (requests.ConnectionError, requests.Timeout)):
+                    if not esperar_conexion():
+                        raise SinRed(str(e))
+                    continue                     # caída de red: no cuenta como bloqueo
                 self.rb.bloqueo(f"red: {type(e).__name__}")
                 continue
             if r.status_code in (429, 503) or "sorry/index" in r.url:
@@ -122,6 +150,10 @@ class GoogleNews:
         try:
             r = self.s.get(f"https://news.google.com/rss/articles/{gid}", timeout=30)
         except requests.RequestException as e:
+            if isinstance(e, (requests.ConnectionError, requests.Timeout)):
+                if not esperar_conexion():
+                    raise SinRed(str(e))
+                return None
             self.rd.bloqueo(f"red: {type(e).__name__}")
             return None
         if r.status_code in (429, 503) or "sorry/index" in r.url:
@@ -143,6 +175,10 @@ class GoogleNews:
                              data={"f.req": json.dumps([[req]])}, timeout=30,
                              headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
         except requests.RequestException as e:
+            if isinstance(e, (requests.ConnectionError, requests.Timeout)):
+                if not esperar_conexion():
+                    raise SinRed(str(e))
+                return None
             self.rd.bloqueo(f"red: {type(e).__name__}")
             return None
         if r2.status_code in (429, 503):
