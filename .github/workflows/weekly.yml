@@ -62,7 +62,7 @@ jobs:
             echo "Sin cambios en el Excel — skip commit"
           else
             git commit -m "chore(data): refresh Excel $(date -u +%Y-%m-%d)"
-            git push
+            for i in 1 2 3; do git push && break; sleep $((i*10)); git pull --rebase -X theirs || { git rebase --abort; git pull --no-rebase -X ours; }; done
           fi
 
       - name: Trigger Vercel redeploy (fallback si no hay cambios commit)
