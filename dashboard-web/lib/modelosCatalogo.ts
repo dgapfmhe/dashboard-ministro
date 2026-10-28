@@ -1,7 +1,7 @@
 /* Catálogo de modelos del Laboratorio: descripción, supuestos y parámetros editables.
  * Los nombres de parámetros coinciden con public/lab/laboratorio.py. */
 
-export type Familia = 'referencia' | 'econometrico' | 'ml'
+export type Familia = 'referencia' | 'econometrico' | 'ml' | 'combinacion'
 export type Param =
   | { k: string; etiqueta: string; tipo: 'int'; min: number; max: number; def: number; ayuda?: string; hp?: boolean }
   | { k: string; etiqueta: string; tipo: 'num'; min: number; max: number; paso: number; def: number; ayuda?: string; hp?: boolean }
@@ -188,8 +188,25 @@ export const CATALOGO: FichaModelo[] = [
   },
 ]
 
+/* Combinaciones (no se agregan como modelo: se eligen en «Combinación de modelos») */
+CATALOGO.push(
+  { tipo: 'comb_promedio', nombre: 'Promedio simple', familia: 'combinacion', ecuacion: 'ŷ = (1/M) Σ ŷₘ',
+    descripcion: 'Promedia los pronósticos de los modelos elegidos con igual peso.',
+    supuestos: 'Ninguno; diversifica errores de especificación.', cuando: 'Casi siempre: suele ser difícil de vencer (el "puzzle de la combinación").',
+    limites: 'Un modelo muy malo arrastra el promedio.', usaExog: 'Las de sus modelos', params: [] },
+  { tipo: 'comb_mediana', nombre: 'Mediana de modelos', familia: 'combinacion', ecuacion: 'ŷ = mediana(ŷ₁ … ŷ_M)',
+    descripcion: 'Toma la mediana de los pronósticos: robusta a un modelo extremo.',
+    supuestos: 'Ninguno.', cuando: 'Cuando algún modelo diverge mucho (p. ej. redes o árboles inestables).',
+    limites: 'Ignora el desempeño relativo.', usaExog: 'Las de sus modelos', params: [] },
+  { tipo: 'comb_inv_mse', nombre: 'Promedio ponderado (1/ECM)', familia: 'combinacion', ecuacion: 'ŷ = Σ wₘ ŷₘ,  wₘ ∝ 1/ECMₘ',
+    descripcion: 'Pondera cada modelo por la inversa de su error cuadrático medio fuera de muestra. En la evaluación, los pesos de cada período usan solo errores anteriores.',
+    supuestos: 'El desempeño pasado informa el futuro.', cuando: 'Cuando hay diferencias claras y estables de precisión entre modelos.',
+    limites: 'Pesos ruidosos con pocas evaluaciones.', usaExog: 'Las de sus modelos', params: [] },
+)
+
 export const FICHA = Object.fromEntries(CATALOGO.map(c => [c.tipo, c])) as Record<string, FichaModelo>
 export const NOMBRE_FAMILIA: Record<Familia, string> = {
+  combinacion: 'Combinación',
   referencia: 'Referencia', econometrico: 'Econométrico', ml: 'Machine learning',
 }
 

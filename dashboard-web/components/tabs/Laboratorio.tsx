@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine, Scatter,
@@ -16,6 +16,18 @@ import {
   type PredOficial, type PredMetrica,
 } from '@/lib/laboratorio'
 import { CATALOGO, FICHA, NOMBRE_FAMILIA, ETIQUETA_PROP, specPorDefecto, type Param, type Familia } from '@/lib/modelosCatalogo'
+import {
+  JUICIO_VACIO, NOMBRE_MODO, NOMBRE_RIESGO, aplicarJuicio, cargarJuicio, guardarJuicio,
+  type Juicio, type ModoJuicio, type Riesgo,
+} from '@/lib/juicio'
+
+type Escenario = { tipo: 'persistencia' | 'valores' | 'cambio'; valores: string }
+type Contexto = {
+  variable: string; transformacion: string; frecuencia: string; desde: string
+  exogenas: { nombre: string; detalle: string }[]; dummies: string[]; backtest: string
+}
+const NIVELES = [50, 68, 80, 90, 95]
+const ZN: Record<number, number> = { 50: 0.674, 68: 0.994, 80: 1.2816, 90: 1.6449, 95: 1.96 }
 
 /* Laboratorio de pronósticos t+1 con sentimiento de prensa.
  * Python (statsmodels + scikit-learn) corre EN EL NAVEGADOR vía Pyodide → /lab/laboratorio.py,
@@ -77,6 +89,15 @@ export default function Laboratorio() {
   const [ventana, setVentana] = useState(60)
   const [minTrain, setMinTrain] = useState(36)
   const [reest, setReest] = useState(12)
+  const [evaluarDesde, setEvaluarDesde] = useState('')
+  const [horizonte, setHorizonte] = useState(3)
+  const [nivel, setNivel] = useState(90)
+  const [escenarios, setEscenarios] = useState<Record<string, Escenario>>({})
+  const [combMet, setCombMet] = useState<Record<string, boolean>>({ promedio: true, mediana: false, inv_mse: true })
+  const [combExcluir, setCombExcluir] = useState<string[]>([])
+  const [juicio, setJuicioState] = useState<Juicio>(JUICIO_VACIO)
+  const setJuicio = (j: Juicio) => { const nj = { ...j, actualizado: new Date().toISOString() }; setJuicioState(nj); guardarJuicio(objetivo, transf, nj) }
+  useEffect(() => { setJuicioState(cargarJuicio(objetivo, transf) ?? JUICIO_VACIO) }, [objetivo, transf])
 
   /* ── resultados ── */
   const [res, setRes] = useState<Resultado | null>(null)
@@ -105,8 +126,9 @@ export default function Laboratorio() {
   const sectores = cats.filter(c => c.nivel === 1).sort((a, b) => a.nombre.localeCompare(b.nombre))
   const sentActivas = (Object.keys(sentSel) as FuenteSent[]).filter(k => sentSel[k])
 
+  const [preparando, setPreparando] = useState(false)
   const correr = async () => {
-    setError(null)
+    setError(null); setPreparando(true)
     try {
       const [obj, sent, ...otrasS] = await Promise.all([
         serieDashboard(objetivo),
@@ -126,17 +148,39 @@ export default function Laboratorio() {
         exogenas,
         dummies: { estacionales, lista: dums.map(d => ({ ...d, desde: d.desde ? `${d.desde}-01` : undefined, hasta: d.hasta ? `${d.hasta}-01` : undefined })) },
         modelos,
-        backtest: { esquema, ventana, min_train: minTrain, reestimar_cada: reest },
+        horizonte,
+        escenarios: Object.fromEntries(Object.entries(escenarios).map(([k, e]) => [k, {
+          tipo: e.tipo,
+          valores: e.valores.split(/[;,]/).map(x => x.trim()).map(x => (x === '' || isNaN(Number(x)) ? null : Number(x))),
+        }])),
+        combinacion: {
+          metodos: Object.keys(combMet).filter(k => combMet[k]),
+          incluir: modelos.map(x => x.id).filter(id => !combExcluir.includes(id)),
+        },
+        backtest: { esquema, ventana, min_train: minTrain, reestimar_cada: reest, evaluar_desde: evaluarDesde ? `${evaluarDesde}-01` : undefined },
       }
+      setPreparando(false)
       const r = await motor.correr(payload)
       setRes(r)
       setSelModelo(mejorModelo(r)?.id ?? r.modelos[0]?.id ?? '')
       setVerIA(r.interanual)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    }
+    } finally { setPreparando(false) }
   }
 
+  const exogLista = [
+    ...sentActivas.map(k => ({ id: `${k}_${sentCat}`, nombre: `${NOMBRE_SENT[k]} ${sentCat}`,
+      detalle: `${NOMBRE_TRANSF[sentTransf]}, rezago t-${sentRezago}${sentZ ? ', estandarizada' : ''}, universo ${sentUni}` })),
+    ...otras.map(o => ({ id: o.id, nombre: o.nombre, detalle: `${NOMBRE_TRANSF[o.transformacion]}, rezago t-${o.rezago}${o.estandarizar ? ', estandarizada' : ''}` })),
+  ]
+  const contexto: Contexto = {
+    variable: varObj?.nombre ?? objetivo, transformacion: NOMBRE_TRANSF[transf], frecuencia: freq === 'M' ? 'mensual' : 'trimestral',
+    desde,
+    exogenas: exogLista.map(e => ({ nombre: e.nombre, detalle: e.detalle + (escenarios[e.id] && escenarios[e.id].tipo !== 'persistencia' ? `; escenario ${escenarios[e.id].tipo}: ${escenarios[e.id].valores}` : '') })),
+    dummies: [...(estacionales ? ['estacionales'] : []), ...dums.map(d => `${d.nombre} (${d.tipo}${d.desde ? ' ' + d.desde : ''}${d.hasta ? '→' + d.hasta : ''})`)],
+    backtest: `1 paso adelante, ventana ${esquema === 'expanding' ? 'creciente' : `móvil de ${ventana}`}, mínimo ${minTrain} períodos de entrenamiento, re-estimación cada ${reest}${evaluarDesde ? `, evaluado desde ${evaluarDesde}` : ''}`,
+  }
   const ocupado = motor.estado === 'corriendo'
   const xFmt = freq === 'Q' ? xFmtQuarter : xFmtMonth
   const transfOpts = (Object.keys(NOMBRE_TRANSF) as Transformacion[]).map(t => <option key={t} value={t}>{NOMBRE_TRANSF[t]}</option>)
@@ -306,12 +350,69 @@ export default function Laboratorio() {
             {esquema === 'rolling' && <Campo label="Tamaño ventana"><input type="number" min={24} value={ventana} onChange={e => setVentana(Number(e.target.value))} className={inp} /></Campo>}
             <Campo label="Mín. entrenamiento"><input type="number" min={12} value={minTrain} onChange={e => setMinTrain(Number(e.target.value))} className={inp} /></Campo>
             <Campo label="Re-estimar cada (períodos)"><input type="number" min={1} value={reest} onChange={e => setReest(Number(e.target.value))} className={inp} /></Campo>
+            <Campo label="Evaluar desde (opcional)"><input type="month" value={evaluarDesde} onChange={e => setEvaluarDesde(e.target.value)} className={inp} /></Campo>
           </div>
         </Seccion>
 
-        <button onClick={correr} disabled={ocupado}
+        <Seccion titulo="7 · Horizonte, intervalos y escenarios">
+          <div className="grid grid-cols-2 gap-2">
+            <Campo label="Horizonte (períodos)">
+              <select value={horizonte} onChange={e => setHorizonte(Number(e.target.value))} className={inp}>
+                {[1, 2, 3, 4, 6, 9, 12].map(h => <option key={h} value={h}>{h === 1 ? 't+1' : `t+1 … t+${h}`}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Nivel de confianza">
+              <select value={nivel} onChange={e => setNivel(Number(e.target.value))} className={inp}>
+                {NIVELES.map(n => <option key={n} value={n}>{n}%</option>)}
+              </select>
+            </Campo>
+          </div>
+          {exogLista.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-[#6B7280]">Escenario de cada exógena para los períodos futuros sin dato (en su escala transformada):</p>
+              {exogLista.map(e => {
+                const es = escenarios[e.id] ?? { tipo: 'persistencia', valores: '' }
+                return (
+                  <div key={e.id} className="border border-[#E2E8F0] rounded-md p-1.5 space-y-1">
+                    <p className="font-medium truncate" title={e.nombre}>{e.nombre}</p>
+                    <div className="flex gap-1">
+                      <select value={es.tipo} onChange={ev => setEscenarios(x => ({ ...x, [e.id]: { ...es, tipo: ev.target.value as Escenario['tipo'] } }))} className={inp + ' w-32'}>
+                        <option value="persistencia">Persistencia</option><option value="valores">Valores por período</option><option value="cambio">Cambio por período</option>
+                      </select>
+                      {es.tipo !== 'persistencia' && (
+                        <input value={es.valores} onChange={ev => setEscenarios(x => ({ ...x, [e.id]: { ...es, valores: ev.target.value } }))}
+                               placeholder={es.tipo === 'valores' ? 'p. ej. 0.1, 0.2, , 0.3' : 'p. ej. 0.05'} className={inp + ' flex-1'} />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              <p className="text-[10px] text-[#9CA3AF]">Valores separados por coma, uno por período (vacío = persistencia). Si el dato real ya existe (p. ej. sentimiento del mes en curso) se usa el real.</p>
+            </div>
+          )}
+        </Seccion>
+
+        <Seccion titulo="8 · Combinación de modelos">
+          <div className="flex flex-wrap gap-3">
+            {[['promedio', 'Promedio simple'], ['mediana', 'Mediana'], ['inv_mse', 'Ponderado 1/ECM']].map(([k, l]) => (
+              <label key={k} className="flex items-center gap-1.5"><input type="checkbox" checked={!!combMet[k]} onChange={e => setCombMet(c => ({ ...c, [k]: e.target.checked }))} />{l}</label>
+            ))}
+          </div>
+          <p className="text-[10px] text-[#6B7280]">Modelos que entran en la combinación (las referencias PA y AR no entran):</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {modelos.map(x => (
+              <label key={x.id} className="flex items-center gap-1 text-[10px]">
+                <input type="checkbox" checked={!combExcluir.includes(x.id)} onChange={e => setCombExcluir(c => e.target.checked ? c.filter(i => i !== x.id) : [...c, x.id])} />
+                {FICHA[String(x.tipo)]?.nombre ?? String(x.tipo)}
+              </label>
+            ))}
+          </div>
+          <p className="text-[10px] text-[#9CA3AF]">Cada combinación se evalúa fuera de muestra como un modelo más (con DM vs PA y AR).</p>
+        </Seccion>
+
+        <button onClick={correr} disabled={ocupado || preparando}
                 className="w-full py-2.5 rounded-lg bg-[#1B3A5C] text-white text-[12px] font-semibold hover:bg-[#2D6A9F] disabled:opacity-60">
-          {ocupado ? 'Calculando…' : 'Correr laboratorio'}
+          {preparando ? 'Preparando datos…' : ocupado ? 'Calculando…' : 'Correr laboratorio'}
         </button>
         <EstadoMotor estado={motor.estado} texto={motor.texto} progreso={motor.progreso} />
       </div>
@@ -328,7 +429,8 @@ export default function Laboratorio() {
             <p className="text-[#9CA3AF]">Referencia de la investigación: el ISEC general no mejoró al AR para inflación e IMAE agregados (DM no significativo). Úsalo para verificarlo con los datos nuevos, por sector y con texto completo.</p>
           </div>
         )}
-        {res && <Resultados res={res} sel={selModelo} setSel={setSelModelo} verIA={verIA} setVerIA={setVerIA} xFmt={xFmt} transf={transf} />}
+        {res && <Resultados res={res} sel={selModelo} setSel={setSelModelo} verIA={verIA} setVerIA={setVerIA} xFmt={xFmt} transf={transf}
+                            nivel={nivel} juicio={juicio} setJuicio={setJuicio} contexto={contexto} />}
         <Oficiales datos={oficiales} />
       </div>
     </div>
@@ -372,27 +474,57 @@ function mejorModelo(r: Resultado): ResultadoModelo | undefined {
     .sort((a, b) => (a.metricas!.rmse! - b.metricas!.rmse!))[0]
 }
 
-function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf }: {
+function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf, nivel, juicio, setJuicio, contexto }: {
   res: Resultado; sel: string; setSel: (s: string) => void; verIA: boolean; setVerIA: (b: boolean) => void
   xFmt: (v: string) => string; transf: Transformacion
+  nivel: number; juicio: Juicio; setJuicio: (j: Juicio) => void; contexto: Contexto
 }) {
   const ok = res.modelos.filter(m => !m.error)
   const m = ok.find(x => x.id === sel) ?? ok[0]
   const mejor = mejorModelo(res)
   const unidad = ['pct_mm', 'pct_aa', 'logdif'].includes(transf) ? '%' : ''
+  const z = ZN[nivel] ?? 1.96
+
+  /* base del pronóstico final: la elegida en el juicio, o la mejor combinación, o el mejor modelo */
+  const combos = ok.filter(x => x.familia === 'combinacion' && x.metricas?.rmse != null).sort((a, b) => a.metricas!.rmse! - b.metricas!.rmse!)
+  const baseId = juicio.base && ok.some(x => x.id === juicio.base) ? juicio.base : (combos[0]?.id ?? mejor?.id ?? m?.id)
+  const baseM = ok.find(x => x.id === baseId)
+  const esMM = transf === 'pct_mm' && res.interanual
+  const final = useMemo(() => (baseM?.trayectoria ? aplicarJuicio(baseM.trayectoria, juicio, nivel, esMM) : []), [baseM, juicio, nivel, esMM])
 
   const abanico = useMemo(() => {
     const n = res.serie.fechas.length
     const pts: Record<string, unknown>[] = res.serie.fechas.slice(Math.max(0, n - 36)).map((f, i, arr) => ({ fecha: f, real: res.serie.y[n - arr.length + i] }))
     const last = pts[pts.length - 1]
-    const p = m?.pronostico
-    if (p && p.media != null && last) {
+    const tr = m?.trayectoria ?? []
+    if (last && tr.length) {
       const y0 = last.real as number
-      last.b95 = [y0, y0]; last.b80 = [y0, y0]; last.pron = y0
-      pts.push({ fecha: p.fecha, pron: p.media, b95: [p.li95, p.ls95], b80: [p.li80, p.ls80] })
+      last.banda = [y0, y0]; last.pron = y0; last.final = y0; last.bandaF = [y0, y0]
+      tr.forEach((p, k) => {
+        const fp = final[k]
+        pts.push({
+          fecha: p.fecha, pron: p.media,
+          banda: p.media != null && p.sd != null ? [p.media - z * p.sd, p.media + z * p.sd] : null,
+          final: fp?.final ?? null, bandaF: fp?.li != null ? [fp.li, fp.ls] : null,
+        })
+      })
     }
     return pts
-  }, [res, m])
+  }, [res, m, final, z])
+  const mostrarFinal = juicio.activo || baseM?.id !== m?.id
+  const [generando, setGenerando] = useState(false)
+  const [errorPDF, setErrorPDF] = useState<string | null>(null)
+  const descargarPDF = async () => {
+    if (!baseM) return
+    setGenerando(true); setErrorPDF(null)
+    try {
+      const { generarReportePDF } = await import('@/lib/reportePDF')
+      await generarReportePDF(res, { ...contexto, unidad, muestraDesde: contexto.desde, nivel, base: baseM, final, juicio, fmtFecha: xFmt })
+    } catch (e) {
+      console.error('[reporte PDF]', e)
+      setErrorPDF(e instanceof Error ? e.message : String(e))
+    } finally { setGenerando(false) }
+  }
 
   const [verBt, setVerBt] = useState<'todos' | 'sel'>('todos')
   const bt = useMemo(() => {
@@ -419,9 +551,13 @@ function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf }: {
         </div>
       )}
 
+      <PronosticoFinal res={res} base={baseM} final={final} juicio={juicio} nivel={nivel} unidad={unidad} xFmt={xFmt}
+                       onPDF={descargarPDF} generando={generando} />
+      {errorPDF && <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] rounded-lg p-2">No se pudo generar el PDF: {errorPDF}</div>}
+
       <div className="bg-white rounded-xl border border-[#D1D9E0] p-4">
         <div className="flex flex-wrap items-baseline gap-2 mb-3">
-          <h3 className="text-[14px] font-semibold text-[#1A202C]">Pronóstico para {xFmt(res.fecha_pronostico)}</h3>
+          <h3 className="text-[14px] font-semibold text-[#1A202C]">Pronóstico de cada modelo para {xFmt(res.fecha_pronostico)}</h3>
           <span className="text-[10px] text-[#9CA3AF]">muestra {xFmt(res.muestra.desde)} – {xFmt(res.muestra.hasta)} · {res.muestra.n} períodos
             {Object.keys(res.exog_sig).length > 0 && ` · exógenas en t+1: ${Object.entries(res.exog_sig).map(([k, v]) => `${k} = ${f3(v)}`).join(', ')}`}
             {res.dummies.length > 0 && ` · ${res.dummies.length} dummies`}</span>
@@ -438,7 +574,7 @@ function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf }: {
               {x.error ? <p className="text-[10px] text-red-700 mt-1">{x.error}</p> : (
                 <>
                   <p className="text-[18px] font-semibold text-[#1A202C] tabular-nums">{f3(x.pronostico?.media)}{unidad}</p>
-                  <p className="text-[10px] text-[#6B7280] tabular-nums">95%: [{f3(x.pronostico?.li95, 2)} ; {f3(x.pronostico?.ls95, 2)}]
+                  <p className="text-[10px] text-[#6B7280] tabular-nums">{nivel}%: [{f3((x.trayectoria?.[0]?.media ?? 0) - z * (x.trayectoria?.[0]?.sd ?? 0), 2)} ; {f3((x.trayectoria?.[0]?.media ?? 0) + z * (x.trayectoria?.[0]?.sd ?? 0), 2)}]
                     {x.pronostico?.interanual != null && <> · interanual <b>{f3(x.pronostico.interanual, 2)}%</b></>}</p>
                   <p className="text-[10px] tabular-nums mt-0.5">
                     <span className={(met(x)?.rrmse_ar ?? 1) < 1 ? 'text-green-700' : 'text-[#6B7280]'}>RMSE/AR {f3(met(x)?.rrmse_ar, 2)}</span>
@@ -452,26 +588,36 @@ function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf }: {
         </div>
       </div>
 
-      <Tarjeta titulo={`Abanico · ${m?.nombre ?? ''}`} sub="Últimos 36 períodos observados y pronóstico t+1 con bandas de 80% y 95%">
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={abanico} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={C.gridStroke} vertical={false} />
-            <XAxis dataKey="fecha" tickFormatter={xFmt} tick={{ fontSize: 10, fill: C.axisStroke }} minTickGap={30} />
-            <YAxis tick={{ fontSize: 10, fill: C.axisStroke }} width={44} domain={['auto', 'auto']} tickFormatter={v => Number(v).toFixed(2)} />
-            <Tooltip labelFormatter={l => xFmt(String(l))} formatter={(v) => Array.isArray(v) ? v.map(x => f3(Number(x), 2)).join(' – ') : f3(Number(v))} />
-            <Area dataKey="b95" name="95%" stroke="none" fill={C.red} fillOpacity={0.12} isAnimationActive={false} />
-            <Area dataKey="b80" name="80%" stroke="none" fill={C.red} fillOpacity={0.22} isAnimationActive={false} />
-            <Line dataKey="real" name="Observado" stroke={C.blue} strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line dataKey="pron" name="Pronóstico" stroke={C.red} strokeWidth={2} strokeDasharray="4 3" dot={{ r: 3 }} isAnimationActive={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <Tarjeta titulo={`Abanico · ${m?.nombre ?? ''}`}
+               sub={`Últimos 36 períodos observados y trayectoria a ${m?.trayectoria?.length ?? 1} período(s) con banda de ${nivel}%` + (mostrarFinal ? ` · verde: pronóstico final (${baseM?.nombre ?? ''}${juicio.activo ? ' + juicio experto' : ''})` : '')}>
+        <div id="rep-abanico" className="bg-white">
+          <ResponsiveContainer width="100%" height={290}>
+            <ComposedChart data={abanico} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={C.gridStroke} vertical={false} />
+              <XAxis dataKey="fecha" tickFormatter={xFmt} tick={{ fontSize: 10, fill: C.axisStroke }} minTickGap={30} />
+              <YAxis tick={{ fontSize: 10, fill: C.axisStroke }} width={44} domain={['auto', 'auto']} tickFormatter={v => Number(v).toFixed(2)} />
+              <Tooltip labelFormatter={l => xFmt(String(l))} formatter={(v) => Array.isArray(v) ? v.map(x => f3(Number(x), 2)).join(' – ') : f3(Number(v))} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Area dataKey="banda" name={`Banda ${nivel}% (${m?.nombre ?? ''})`} stroke="none" fill={C.red} fillOpacity={0.15} isAnimationActive={false} />
+              {mostrarFinal && <Area dataKey="bandaF" name={`Banda ${nivel}% final`} stroke="none" fill={C.green} fillOpacity={0.12} isAnimationActive={false} />}
+              <Line dataKey="real" name="Observado" stroke={C.blue} strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line dataKey="pron" name="Pronóstico del modelo" stroke={C.red} strokeWidth={2} strokeDasharray="4 3" dot={{ r: 3 }} isAnimationActive={false} />
+              {mostrarFinal && <Line dataKey="final" name="Pronóstico final" stroke={C.green} strokeWidth={2.4} dot={{ r: 3 }} isAnimationActive={false} />}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </Tarjeta>
+
+      <JuicioExperto res={res} ok={ok} baseId={baseId ?? ''} juicio={juicio} setJuicio={setJuicio} final={final} nivel={nivel} xFmt={xFmt} unidad={unidad} />
+
+      <TrayectoriasModelos ok={ok} res={res} xFmt={xFmt} />
 
       <Tarjeta titulo="Evaluación fuera de muestra (1 paso adelante)" sub="Cada punto se pronosticó solo con información disponible hasta el período anterior"
                extra={<div className="flex gap-2">
                  <Seg opts={[['todos', 'Todos'], ['sel', 'Seleccionado + refs.']]} val={verBt} on={v => setVerBt(v as 'todos' | 'sel')} />
                  {res.interanual && <Seg opts={[['no', 'Escala del modelo'], ['si', 'Interanual']]} val={verIA ? 'si' : 'no'} on={v => setVerIA(v === 'si')} />}
                </div>}>
+        <div id="rep-backtest" className="bg-white">
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={bt} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={C.gridStroke} vertical={false} />
@@ -488,6 +634,7 @@ function Resultados({ res, sel, setSel, verIA, setVerIA, xFmt, transf }: {
             ))}
           </ComposedChart>
         </ResponsiveContainer>
+        </div>
       </Tarjeta>
 
       <Tarjeta titulo={`Métricas${verIA ? ' (escala interanual)' : ''}`}
@@ -680,6 +827,157 @@ function Oficiales({ datos }: { datos: { nowcast: PredOficial[]; vintages: PredO
   )
 }
 
+/* ─── Pronóstico final (modelo base + juicio) ──────────────────────── */
+function PronosticoFinal({ res, base, final, juicio, nivel, unidad, xFmt, onPDF, generando }: {
+  res: Resultado; base?: ResultadoModelo; final: ReturnType<typeof aplicarJuicio>; juicio: Juicio; nivel: number
+  unidad: string; xFmt: (v: string) => string; onPDF: () => void; generando: boolean
+}) {
+  const f = final[0]
+  if (!base || !f) return null
+  return (
+    <div className="bg-white rounded-xl border-2 border-[#1B3A5C] p-4">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex-1 min-w-[240px]">
+          <p className="text-[11px] text-[#6B7280]">Pronóstico {juicio.activo ? 'final (modelo + juicio experto)' : 'final'} · {xFmt(res.fecha_pronostico)}</p>
+          <p className="text-[30px] font-bold text-[#1B3A5C] tabular-nums leading-tight">{f3(f.final)}{unidad}</p>
+          <p className="text-[11px] text-[#4A5568] tabular-nums">Intervalo {nivel}%: {f3(f.li, 2)} a {f3(f.ls, 2)}{unidad}
+            {f.interanual_final != null && <> · interanual implícita <b>{f3(f.interanual_final, 2)}%</b></>}</p>
+          <p className="text-[10px] text-[#6B7280] mt-1">Base: <b>{base.nombre}</b> ({f3(f.modelo)}{unidad})
+            {juicio.activo && f.ajuste != null && <> · juicio {f.ajuste >= 0 ? '+' : ''}{f3(f.ajuste)} ({NOMBRE_MODO[juicio.modo].toLowerCase()})</>}
+            {' · '}último dato {xFmt(res.ultimo_real.fecha)}: {f3(res.ultimo_real.valor)}{unidad}</p>
+        </div>
+        {final.length > 1 && (
+          <div className="text-[10px] tabular-nums">
+            <p className="text-[#6B7280] mb-0.5">Trayectoria final</p>
+            <div className="grid grid-cols-[auto_auto_auto] gap-x-3">
+              {final.map(p => (
+                <Fragment key={p.fecha}>
+                  <span>{xFmt(p.fecha)}</span><b>{f3(p.final)}</b>
+                  <span className="text-[#9CA3AF]">[{f3(p.li, 2)}; {f3(p.ls, 2)}]</span>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={onPDF} disabled={generando}
+                className="self-center px-4 py-2.5 rounded-lg bg-[#1B3A5C] text-white text-[12px] font-semibold hover:bg-[#2D6A9F] disabled:opacity-60 flex items-center gap-2">
+          {generando ? 'Generando…' : <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><polyline points="9 15 12 18 15 15" /></svg>
+            Descargar reporte PDF</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Juicio experto ────────────────────────────────────────────────── */
+function JuicioExperto({ res, ok, baseId, juicio, setJuicio, final, nivel, xFmt, unidad }: {
+  res: Resultado; ok: ResultadoModelo[]; baseId: string; juicio: Juicio; setJuicio: (j: Juicio) => void
+  final: ReturnType<typeof aplicarJuicio>; nivel: number; xFmt: (v: string) => string; unidad: string
+}) {
+  const h = res.fechas_futuras.length
+  const set = (p: Partial<Juicio>) => setJuicio({ ...juicio, ...p })
+  const etiquetaValor = juicio.modo === 'ajuste' ? `ajuste (${unidad || 'unid.'})` : juicio.modo === 'valor' ? 'mi valor' : 'mi valor (se mezcla)'
+  return (
+    <Tarjeta titulo="Juicio experto" sub="Incorpora información que los modelos no ven (anuncios, choques, conocimiento del sector). El pronóstico del modelo se conserva siempre al lado; el reporte documenta el ajuste, su autor y su justificación."
+             extra={<label className="flex items-center gap-2 text-[11px] font-medium">
+               <input type="checkbox" checked={juicio.activo} onChange={e => set({ activo: e.target.checked, base: juicio.base || baseId })} />Aplicar juicio experto</label>}>
+      <div className={`space-y-3 text-[11px] ${juicio.activo ? '' : 'opacity-50 pointer-events-none'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <Campo label="Pronóstico base">
+            <select value={juicio.base || baseId} onChange={e => set({ base: e.target.value })} className={inp}>
+              {ok.map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
+          </Campo>
+          <Campo label="Tipo de juicio">
+            <select value={juicio.modo} onChange={e => set({ modo: e.target.value as ModoJuicio })} className={inp}>
+              {(Object.keys(NOMBRE_MODO) as ModoJuicio[]).map(k => <option key={k} value={k}>{NOMBRE_MODO[k]}</option>)}
+            </select>
+          </Campo>
+          <Campo label="Balance de riesgos">
+            <select value={juicio.riesgo} onChange={e => set({ riesgo: e.target.value as Riesgo })} className={inp}>
+              {(Object.keys(NOMBRE_RIESGO) as Riesgo[]).map(k => <option key={k} value={k}>{NOMBRE_RIESGO[k]}</option>)}
+            </select>
+          </Campo>
+          {juicio.riesgo !== 'balanceado' && (
+            <Campo label={`Ensanchar banda del lado del riesgo: ${juicio.asimetria}%`}>
+              <input type="range" min={0} max={200} step={10} value={juicio.asimetria} onChange={e => set({ asimetria: Number(e.target.value) })} className="accent-[#1B3A5C]" />
+            </Campo>
+          )}
+        </div>
+        {juicio.modo === 'mezcla' && (
+          <Campo label={`Peso de mi juicio λ = ${juicio.peso.toFixed(2)} (0 = solo modelo, 1 = solo juicio)`}>
+            <input type="range" min={0} max={1} step={0.05} value={juicio.peso} onChange={e => set({ peso: Number(e.target.value) })} className="accent-[#1B3A5C] w-64" />
+          </Campo>
+        )}
+        <div className="overflow-x-auto">
+          <table className="text-[11px] tabular-nums">
+            <thead><tr className="text-[#6B7280]">
+              <th className="text-left font-medium pr-3 py-1">Período</th><th className="text-right font-medium px-2">Modelo</th>
+              <th className="font-medium px-2">{etiquetaValor}</th><th className="text-right font-medium px-2">Final</th>
+              <th className="text-right font-medium px-2">IC {nivel}%</th>{res.interanual && <th className="text-right font-medium px-2">Interanual final</th>}
+            </tr></thead>
+            <tbody>
+              {Array.from({ length: h }, (_, k) => {
+                const p = final[k]
+                return (
+                  <tr key={k} className="border-t border-[#F1F3F6]">
+                    <td className="pr-3 py-1">{xFmt(res.fechas_futuras[k])}</td>
+                    <td className="text-right px-2">{f3(p?.modelo)}</td>
+                    <td className="px-2"><input type="number" step="0.01" value={juicio.valores[k] ?? ''}
+                      onChange={e => { const v = [...juicio.valores]; while (v.length < h) v.push(null); v[k] = e.target.value === '' ? null : Number(e.target.value); set({ valores: v }) }}
+                      className={inp + ' w-24'} placeholder={juicio.modo === 'ajuste' ? '0' : f3(p?.modelo)} /></td>
+                    <td className="text-right px-2 font-semibold">{f3(p?.final)}</td>
+                    <td className="text-right px-2 text-[#6B7280]">[{f3(p?.li, 2)}; {f3(p?.ls, 2)}]</td>
+                    {res.interanual && <td className="text-right px-2">{f3(p?.interanual_final, 2)}</td>}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-2">
+          <Campo label="Autor"><input value={juicio.autor} onChange={e => set({ autor: e.target.value })} className={inp} placeholder="Nombre y cargo" /></Campo>
+          <Campo label="Justificación (va en el reporte)">
+            <textarea value={juicio.justificacion} onChange={e => set({ justificacion: e.target.value })} rows={2} className={inp + ' w-full'}
+                      placeholder="Ej.: anuncio de alza de combustibles para noviembre no capturado por los modelos; se suma +0.15 pp." />
+          </Campo>
+        </div>
+        <p className="text-[10px] text-[#9CA3AF]">Se guarda en este navegador por variable y transformación{juicio.actualizado ? ` · última edición ${new Date(juicio.actualizado).toLocaleString('es-DO')}` : ''}.</p>
+      </div>
+    </Tarjeta>
+  )
+}
+
+/* ─── Trayectorias de todos los modelos ─────────────────────────────── */
+function TrayectoriasModelos({ ok, res, xFmt }: { ok: ResultadoModelo[]; res: Resultado; xFmt: (v: string) => string }) {
+  const [abierto, setAbierto] = useState(false)
+  if (res.fechas_futuras.length < 2) return null
+  return (
+    <Tarjeta titulo="Trayectoria de cada modelo" sub="Media pronosticada por período. Más allá de t+1, las exógenas siguen el escenario elegido."
+             extra={<button onClick={() => setAbierto(a => !a)} className="text-[11px] text-[#2D6A9F]">{abierto ? 'ocultar' : 'ver tabla'}</button>}>
+      {abierto && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] tabular-nums">
+            <thead><tr className="text-[#6B7280] border-b border-[#E2E8F0]">
+              <th className="text-left font-medium py-1 pr-2">Modelo</th>
+              {res.fechas_futuras.map(f => <th key={f} className="text-right font-medium px-2">{xFmt(f)}</th>)}
+            </tr></thead>
+            <tbody>
+              {ok.map(x => (
+                <tr key={x.id} className="border-b border-[#F1F3F6]">
+                  <td className="py-1 pr-2 whitespace-nowrap max-w-[260px] truncate" title={x.nombre}><FamiliaChip f={x.familia} /> {x.nombre}</td>
+                  {(x.trayectoria ?? []).map(p => <td key={p.fecha} className="text-right px-2">{f3(p.media)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Tarjeta>
+  )
+}
+
 /* ─── Editor de modelo (dirigido por el catálogo) ──────────────────── */
 const inp = 'border border-[#D1D9E0] rounded-md px-2 py-1.5 bg-white text-[11px] min-w-0'
 
@@ -733,7 +1031,8 @@ function EditorModelo({ m, onChange, onRemove, onDup }: { m: ModeloSpec; onChang
 
 /* ─── piezas ────────────────────────────────────────────────────────── */
 function FamiliaChip({ f }: { f: Familia }) {
-  const c = f === 'ml' ? 'bg-purple-100 text-purple-800' : f === 'econometrico' ? 'bg-blue-100 text-blue-800' : 'bg-[#EEF0F4] text-[#4A5568]'
+  const c = f === 'ml' ? 'bg-purple-100 text-purple-800' : f === 'econometrico' ? 'bg-blue-100 text-blue-800'
+    : f === 'combinacion' ? 'bg-amber-100 text-amber-800' : 'bg-[#EEF0F4] text-[#4A5568]'
   return <span className={`px-1 rounded text-[9px] whitespace-nowrap ${c}`}>{NOMBRE_FAMILIA[f]}</span>
 }
 function EstadoMotor({ estado, texto, progreso }: { estado: string; texto: string; progreso: { f: number; nombre: string } | null }) {
@@ -745,6 +1044,7 @@ function EstadoMotor({ estado, texto, progreso }: { estado: string; texto: strin
     </div>
   )
   if (estado === 'listo') return <p className="text-[10px] text-green-700">Python listo (statsmodels + scikit-learn en el navegador).</p>
+  if (estado === 'apagado' && texto) return <p className="text-[10px] text-red-700">{texto}</p>
   return null
 }
 const Spin = () => <span className="w-3 h-3 border-2 border-[#CBD5E0] border-t-[#1B3A5C] rounded-full animate-spin inline-block" />

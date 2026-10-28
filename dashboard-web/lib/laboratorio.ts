@@ -9,7 +9,7 @@ import {
 /* ─── Tipos del payload (espejo de public/lab/laboratorio.py) ──────── */
 export type Transformacion = 'nivel' | 'log' | 'pct_mm' | 'pct_aa' | 'dif' | 'dif_aa' | 'logdif'
 export type Agregacion = 'promedio' | 'ultimo' | 'suma'
-export type TipoModelo = 'rw' | 'media' | 'ar' | 'arima' | 'sarimax' | 'arx' | 'var'
+export type TipoModelo = 'comb' | 'rw' | 'media' | 'ar' | 'arima' | 'sarimax' | 'arx' | 'var'
   | 'ridge' | 'lasso' | 'enet' | 'rf' | 'gbr' | 'svr' | 'knn' | 'mlp'
 
 export type SerieIn = { fechas: string[]; valores: (number | null)[] }
@@ -31,7 +31,10 @@ export type Payload = {
   exogenas: ExogIn[]
   dummies: { estacionales: boolean; lista: Dummy[] }
   modelos: ModeloSpec[]
-  backtest: { esquema: 'expanding' | 'rolling'; ventana: number; min_train: number; reestimar_cada: number }
+  horizonte: number
+  escenarios: Record<string, { tipo: 'persistencia' | 'valores' | 'cambio'; valores: (number | null)[] }>
+  combinacion: { metodos: string[]; incluir?: string[] }
+  backtest: { esquema: 'expanding' | 'rolling'; ventana: number; min_train: number; reestimar_cada: number; evaluar_desde?: string }
 }
 
 export type Metricas = {
@@ -44,7 +47,8 @@ export type Pronostico = {
 }
 export type ResultadoModelo = {
   id: string; tipo: TipoModelo; nombre: string; benchmark: boolean; error: string | null
-  familia: 'referencia' | 'econometrico' | 'ml'; ecuacion?: string
+  familia: 'referencia' | 'econometrico' | 'ml' | 'combinacion'; ecuacion?: string
+  trayectoria?: { fecha: string; media: number | null; sd: number | null; interanual?: number | null }[]
   propiedades?: Record<string, unknown>; spec?: Record<string, unknown>
   pronostico?: Pronostico; usa_exog?: boolean
   coef?: { nombre: string; valor: number | null; ee: number | null; p: number | null }[]
@@ -59,6 +63,9 @@ export type Resultado = {
   serie: { fechas: string[]; y: (number | null)[] }
   exogenas: Record<string, (number | null)[]>
   exog_sig: Record<string, number | null>
+  exog_futuro: Record<string, (number | null)[]>
+  fechas_futuras: string[]
+  ultimo_real: { fecha: string; valor: number | null }
   dummies: string[]
   modelos: ResultadoModelo[]
   avisos: string[]
@@ -70,14 +77,14 @@ export const NOMBRE_TRANSF: Record<Transformacion, string> = {
   dif: 'Diferencia', dif_aa: 'Diferencia interanual', logdif: 'Δ log ×100',
 }
 export const NOMBRE_TIPO: Record<TipoModelo, string> = {
-  rw: 'Paseo aleatorio', media: 'Media histórica', ar: 'AR(p) automático', arima: 'ARIMA',
+  comb: 'Combinación', rw: 'Paseo aleatorio', media: 'Media histórica', ar: 'AR(p) automático', arima: 'ARIMA',
   sarimax: 'SARIMAX + exógenas', arx: 'ARX (MCO) + exógenas', var: 'VAR',
   ridge: 'Ridge', lasso: 'Lasso', enet: 'Elastic Net', rf: 'Random Forest', gbr: 'Gradient Boosting',
   svr: 'SVR', knn: 'K vecinos', mlp: 'Red neuronal (MLP)',
 }
 
 /* ─── Worker de Pyodide ─────────────────────────────────────────────── */
-const VERSION_MOTOR = '2026-10-21d'
+const VERSION_MOTOR = '2026-10-28b'
 
 export function useMotorPython() {
   const w = useRef<Worker | null>(null)
@@ -98,7 +105,9 @@ export function useMotorPython() {
       else if (m.tipo === 'resultado' || m.tipo === 'error') {
         const p = pendientes.current.get(m.id)
         pendientes.current.delete(m.id)
-        setEstado('listo'); setProgreso(null)
+        setProgreso(null)
+        if (m.tipo === 'error' && !p) { setEstado('apagado'); setTexto(m.mensaje); return }   // falló la carga de Python
+        setEstado('listo')
         if (p && m.tipo === 'resultado') p.ok(m.data)
         else if (p) p.ko(new Error(m.mensaje))
       }

@@ -116,6 +116,7 @@ def preparar(p: dict):
     y = transformar(nivel, p.get("transformacion", "nivel"), freq).rename("y")
     cols = {"y": y}
     nombres = []
+    id_de: dict[str, str] = {}
     for ex in p.get("exogenas", []):
         s = a_frecuencia(_serie(ex["fechas"], ex["valores"]), freq, ex.get("agregacion", "promedio"))
         s = transformar(s, ex.get("transformacion", "nivel"), freq)
@@ -125,6 +126,7 @@ def preparar(p: dict):
         nombre = ex.get("nombre", ex["id"]) + (f" (t-{rez})" if rez else " (t)")
         cols[nombre] = s.shift(rez, freq=FREQ_PD[freq]) if rez else s
         nombres.append(nombre)
+        id_de[nombre] = ex["id"]
     df = pd.DataFrame(cols)
     df = df[df.index >= pd.Timestamp(p.get("desde", "2000-01-01"))]
     ult_y = df["y"].last_valid_index()
@@ -166,8 +168,39 @@ def preparar(p: dict):
         raise ValueError(f"Muestra muy corta ({len(muestra)} períodos con todas las variables; mínimo 24). "
                          f"Datos disponibles — " + "; ".join(rangos))
 
-    # determinísticas sobre muestra + t+1
-    D = dummies(muestra.index.append(pd.DatetimeIndex([fecha_sig])), p.get("dummies", {}), freq)
+    # horizonte y escenarios de exógenas (en la escala ya transformada de cada exógena)
+    h = max(1, min(24, int(p.get("horizonte", 1))))
+    fut = pd.date_range(fecha_sig, periods=h, freq=FREQ_PD[freq])
+    X_fut = pd.DataFrame(index=fut, dtype=float)
+    escen = p.get("escenarios", {}) or {}
+    for n in nombres:
+        conocido = df[n].reindex(fut) if n in df else pd.Series(np.nan, index=fut)
+        e = escen.get(id_de[n], {}) or {}
+        vals = e.get("valores") or []
+        tipo = e.get("tipo", "persistencia")
+        prev = df[n].loc[:ult_y].dropna().iloc[-1] if df[n].loc[:ult_y].notna().any() else np.nan
+        serie_f = []
+        for k, f in enumerate(fut):
+            v = conocido.iloc[k]
+            if np.isnan(v):
+                if tipo == "valores" and k < len(vals) and vals[k] is not None:
+                    v = float(vals[k])
+                elif tipo == "cambio" and vals:
+                    v = prev + float(vals[0])
+                else:
+                    v = prev
+                if k > 0 or tipo != "persistencia":
+                    pass
+            serie_f.append(v)
+            prev = v
+        X_fut[n] = serie_f
+        if tipo != "persistencia" and np.isnan(conocido.iloc[0]):
+            avisos = [a for a in avisos if not a.startswith(f"«{n}» aún no tiene dato")]
+            avisos.append(f"«{n}»: escenario '{tipo}' para los períodos sin dato.")
+        X_sig[n] = X_fut[n].iloc[0]
+
+    # determinísticas sobre muestra + horizonte
+    D = dummies(muestra.index.append(fut), p.get("dummies", {}), freq)
     det = list(D.columns)
     vacias = [c for c in det if D.loc[muestra.index, c].nunique() < 2 and "tendencia" not in c]
     if vacias:
@@ -176,7 +209,8 @@ def preparar(p: dict):
     muestra = pd.concat([muestra, D.loc[muestra.index]], axis=1)
     for c in det:
         X_sig[c] = float(D.loc[fecha_sig, c])
-    return muestra, X_sig, fecha_sig, nivel, nombres, det, avisos
+        X_fut[c] = D.loc[fut, c].astype(float).values
+    return muestra, X_sig, fecha_sig, nivel, nombres, det, avisos, X_fut[nombres + det]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -204,6 +238,11 @@ class Base:
     def actualizar(self, y, X):
         self.ajustar(y, X)
     def predecir(self, X_sig): ...
+    def trayectoria(self, X_fut: pd.DataFrame) -> tuple[list[float], list[float]]:
+        """Pronóstico de h períodos (por defecto: t+1 y luego persistencia, sd·√k)."""
+        h = len(X_fut)
+        mu, sd = self.predecir(X_fut.iloc[0] if X_fut.shape[1] else None)
+        return [mu] * h, [sd * math.sqrt(k + 1) for k in range(h)]
     def coeficientes(self):
         return []
     def residuos(self):
@@ -220,8 +259,11 @@ class RW(Base):
         self.sd = float(np.nanstd(y.diff().dropna(), ddof=1)) if len(y) > 2 else float("nan")
     def predecir(self, X_sig):
         return float(self.y.iloc[-1]), self.sd
+    def trayectoria(self, X_fut):
+        h = len(X_fut)
+        return [float(self.y.iloc[-1])] * h, [self.sd * math.sqrt(k + 1) for k in range(h)]
     def ecuacion(self):
-        return "ŷ(t+1) = y(t)"
+        return "ŷ(t+k) = y(t)"
     def propiedades(self):
         return {"desv_cambios": _f(self.sd), "n_obs": len(self.y)}
 
@@ -231,6 +273,8 @@ class Media(Base):
         self.mu, self.sd, self.n = float(y.mean()), float(y.std(ddof=1)), len(y)
     def predecir(self, X_sig):
         return self.mu, self.sd
+    def trayectoria(self, X_fut):
+        return [self.mu] * len(X_fut), [self.sd] * len(X_fut)
     def ecuacion(self):
         return "ŷ(t+1) = media de y en la muestra de entrenamiento"
     def propiedades(self):
@@ -252,6 +296,14 @@ class AR(Base):
     def predecir(self, X_sig):
         f = self.res.predict(start=self.n, end=self.n)
         return float(f[0]), float(np.sqrt(self.res.sigma2))
+    def trayectoria(self, X_fut):
+        h = len(X_fut)
+        f = self.res.predict(start=self.n, end=self.n + h - 1)
+        lags = list(self.res.ar_lags or [])
+        phi = np.zeros(max(lags) if lags else 0)
+        for l, c in zip(lags, np.asarray(self.res.params)[1:]):
+            phi[l - 1] = c
+        return [float(x) for x in f], _sd_psi(phi, float(self.res.sigma2), h)
     def coeficientes(self):
         return _tabla_coef(self.res, ["const"] + [f"y(t-{l})" for l in (self.res.ar_lags or [])])
     def residuos(self):
@@ -295,6 +347,10 @@ class SARIMAX_(Base):
         ex = X_sig[self.activas].values.reshape(1, -1) if self.activas else None
         f = self.res.get_forecast(steps=1, exog=ex)
         return float(f.predicted_mean[0]), float(np.sqrt(f.var_pred_mean[0]))
+    def trayectoria(self, X_fut):
+        ex = X_fut[self.activas].values if self.activas else None
+        f = self.res.get_forecast(steps=len(X_fut), exog=ex)
+        return [float(x) for x in f.predicted_mean], [float(np.sqrt(v)) for v in f.var_pred_mean]
     def coeficientes(self):
         nombres = []
         for n in self.res.model.param_names:
@@ -347,6 +403,18 @@ class ARX(Base):
         fila = [1.0] + [float(self.y.iloc[-i]) for i in range(1, p + 1)] + [float(X_sig[c]) for c in self.activas]
         pr = self.res.get_prediction(np.array(fila).reshape(1, -1))
         return float(pr.predicted_mean[0]), float(np.sqrt(pr.var_pred_mean[0] + self.res.scale))
+    def trayectoria(self, X_fut):
+        p = int(self.spec.get("p", 2))
+        hist = [float(v) for v in self.y.values]
+        beta = np.asarray(self.res.params)
+        medias = []
+        for k in range(len(X_fut)):
+            fila = [1.0] + [hist[-i] for i in range(1, p + 1)] + [float(X_fut.iloc[k][c]) for c in self.activas]
+            mu = float(np.dot(beta, fila))
+            medias.append(mu); hist.append(mu)
+        sds = _sd_psi(beta[1:p + 1], float(self.res.scale), len(X_fut))
+        sds[0] = self.predecir(X_fut.iloc[0])[1]
+        return medias, sds
     def coeficientes(self):
         return _tabla_coef(self.res, self.cols)
     def residuos(self):
@@ -391,6 +459,12 @@ class VAR_(Base):
         ex = X_sig[self.activas].values.reshape(1, -1) if self.activas else None
         f = self.res.forecast(self.D[-self.k:], steps=1, exog_future=ex)[0][0]
         return float(f), float(np.sqrt(self.res.forecast_cov(1)[0][0, 0]))
+    def trayectoria(self, X_fut):
+        h = len(X_fut)
+        ex = X_fut[self.activas].values if self.activas else None
+        f = self.res.forecast(self.D[-self.k:], steps=h, exog_future=ex)[:, 0]
+        cov = self.res.forecast_cov(h)
+        return [float(x) for x in f], [float(np.sqrt(cov[k][0, 0])) for k in range(h)]
     def coeficientes(self):
         import re
         params, se, pv = self.res.params[:, 0], self.res.stderr[:, 0], self.res.pvalues[:, 0]
@@ -482,6 +556,15 @@ class ML(Base):
         mu = float(self.pipe.predict(np.array(fila).reshape(1, -1))[0])
         sd = self.sd_empirico if self.sd_empirico else float(np.std(self.resid_tr, ddof=1))
         return mu, sd
+    def trayectoria(self, X_fut):
+        hist = [float(v) for v in self.y.values]
+        medias = []
+        for k in range(len(X_fut)):
+            fila = [hist[-i] for i in range(1, self.p + 1)] + [float(X_fut.iloc[k][c]) for c in self.activas]
+            mu = float(self.pipe.predict(np.array(fila).reshape(1, -1))[0])
+            medias.append(mu); hist.append(mu)
+        sd1 = self.sd_empirico if self.sd_empirico else float(np.std(self.resid_tr, ddof=1))
+        return medias, [sd1 * math.sqrt(k + 1) for k in range(len(X_fut))]
     def residuos(self):
         return self.resid_tr
     def coeficientes(self):
@@ -534,6 +617,8 @@ def backtest(spec, nombres, det, df, cfg, progreso=None):
     X = df[nombres + det] if (nombres or det) else None
     n = len(df)
     min_train = max(12, int(cfg.get("min_train", 36)))
+    if cfg.get("evaluar_desde"):
+        min_train = max(min_train, int(df.index.searchsorted(pd.Timestamp(cfg["evaluar_desde"]))))
     esquema = cfg.get("esquema", "expanding")
     ventana = int(cfg.get("ventana", 60))
     cada = max(1, int(cfg.get("reestimar_cada", 12)))
@@ -655,7 +740,9 @@ def diagnostico(res) -> dict:
 # 5. CORRIDA COMPLETA
 # ══════════════════════════════════════════════════════════════════════════════
 def correr(p: dict, progreso=None) -> dict:
-    df, X_sig, fecha_sig, nivel, nombres, det, avisos = preparar(p)
+    df, X_sig, fecha_sig, nivel, nombres, det, avisos, X_fut = preparar(p)
+    fut = list(X_fut.index)
+    off = pd.tseries.frequencies.to_offset(FREQ_PD[p.get("frecuencia", "M")])
     freq = p.get("frecuencia", "M")
     bt_cfg = p.get("backtest", {})
     modelos = list(p.get("modelos", []))
@@ -686,8 +773,10 @@ def correr(p: dict, progreso=None) -> dict:
                 e = (bt["real"] - bt["pred"]).dropna()
                 if len(e) >= 6:
                     m.sd_empirico = float(np.sqrt(np.mean(e ** 2)))
-            mu, sd = m.predecir(X_sig if (nombres or det) else None)
+            medias, sds = m.trayectoria(X_fut)
+            mu, sd = medias[0], sds[0]
             r["pronostico"] = _intervalos(fecha_sig, mu, sd)
+            r["trayectoria"] = _tray(fut, medias, sds, nivel if interanual else None, off)
             r["usa_exog"] = bool(getattr(m, "activas", []))
             r["coef"] = m.coeficientes()
             r["diagnostico"] = diagnostico(m.residuos())
@@ -699,14 +788,13 @@ def correr(p: dict, progreso=None) -> dict:
                 ia = a_interanual(bt, nivel, freq)
                 r["backtest_interanual"] = {"fechas": [d.strftime("%Y-%m-%d") for d in ia.index],
                                             "pred": _lst(ia["pred"]), "real": _lst(ia["real"])}
-                if nivel.index[-1] + pd.tseries.frequencies.to_offset(FREQ_PD[freq]) == fecha_sig:
-                    ref = nivel.get(fecha_sig - pd.DateOffset(months=12))
-                    if ref is not None and not np.isnan(ref):
-                        r["pronostico"]["interanual"] = _f((nivel.iloc[-1] * (1 + mu / 100) / ref - 1) * 100)
+                r["pronostico"]["interanual"] = r["trayectoria"][0].get("interanual")
         except Exception as e:
             r["error"] = f"{type(e).__name__}: {e}"
         resultados.append(r)
 
+    resultados += combinaciones(p.get("combinacion") or {}, resultados, bts, fut, nivel if interanual else None,
+                                off, freq, interanual)
     ar_bt, rw_bt = bts.get("ar"), bts.get("rw")
     for r in resultados:
         if r["error"] or r["id"] not in bts:
@@ -728,10 +816,117 @@ def correr(p: dict, progreso=None) -> dict:
         "exogenas": {n: _lst(df[n]) for n in nombres},
         "dummies": det,
         "exog_sig": {n: _f(X_sig[n]) for n in nombres},
+        "exog_futuro": {n: _lst(X_fut[n]) for n in nombres},
+        "fechas_futuras": [f.strftime("%Y-%m-%d") for f in fut],
+        "ultimo_real": {"fecha": df.index[-1].strftime("%Y-%m-%d"), "valor": _f(df["y"].iloc[-1])},
         "modelos": resultados,
         "avisos": avisos,
         "interanual": interanual,
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. COMBINACIÓN DE MODELOS
+# ══════════════════════════════════════════════════════════════════════════════
+NOMBRE_COMB = {"promedio": "Promedio simple", "mediana": "Mediana de modelos",
+               "inv_mse": "Promedio ponderado (1/ECM)"}
+
+
+def combinaciones(cfg: dict, resultados: list[dict], bts: dict, fut, nivel, off, freq, interanual) -> list[dict]:
+    """Combina pronósticos de los modelos elegidos. Cada combinación se evalúa fuera de
+    muestra igual que un modelo: los pesos 1/ECM en t usan SOLO errores anteriores a t."""
+    metodos = cfg.get("metodos") or []
+    incluir = cfg.get("incluir")
+    cands = [r for r in resultados if not r["error"] and r["id"] in bts and not r["benchmark"]
+             and (incluir is None or r["id"] in incluir) and r.get("trayectoria")]
+    if len(cands) < 2 or not metodos:
+        return []
+    ids = [r["id"] for r in cands]
+    P = pd.DataFrame({i: bts[i]["pred"] for i in ids})
+    real = bts[ids[0]]["real"]
+    T = pd.DataFrame({r["id"]: [s["media"] for s in r["trayectoria"]] for r in cands})
+    S = pd.DataFrame({r["id"]: [s["sd"] for s in r["trayectoria"]] for r in cands})
+    E2 = P.sub(real, axis=0) ** 2
+    out = []
+    for met in metodos:
+        if met == "promedio":
+            pred_bt = P.mean(axis=1)
+            w_fin = pd.Series(1 / len(ids), index=ids)
+            medias = T.mean(axis=1)
+        elif met == "mediana":
+            pred_bt = P.median(axis=1)
+            w_fin = None
+            medias = T.median(axis=1)
+        elif met == "inv_mse":
+            preds = []
+            for i in range(len(P)):
+                ecm = E2.iloc[:i].mean() if i >= 6 else None
+                w = (1 / ecm.replace(0, np.nan)) if ecm is not None else pd.Series(1.0, index=ids)
+                fila = P.iloc[i]
+                w = w[fila.notna()]
+                preds.append(float((fila[w.index] * w).sum() / w.sum()) if w.sum() > 0 else np.nan)
+            pred_bt = pd.Series(preds, index=P.index)
+            ecm_tot = E2.mean()
+            w_fin = (1 / ecm_tot) / (1 / ecm_tot).sum()
+            medias = T.mul(w_fin, axis=1).sum(axis=1)
+        else:
+            continue
+        err = real - pred_bt
+        rmse = float(np.sqrt(np.nanmean(err ** 2)))
+        sd_bt = err.shift(1).expanding(min_periods=6).apply(lambda e: np.sqrt(np.nanmean(e ** 2)), raw=True)
+        escala = (S.mean(axis=1) / S.mean(axis=1).iloc[0]).fillna(1).values
+        sds = [rmse * escala[k] for k in range(len(fut))]
+        bt = pd.DataFrame({"pred": pred_bt, "sd": sd_bt, "real": real})
+        cid = f"comb_{met}"
+        bts[cid] = bt
+        tray = _tray(fut, list(medias.values), sds, nivel, off)
+        r = {"id": cid, "tipo": "comb", "familia": "combinacion", "nombre": f"{NOMBRE_COMB[met]} ({len(ids)} modelos)",
+             "benchmark": False, "error": None, "spec": {"metodo": met, "componentes": ids},
+             "trayectoria": tray, "pronostico": {**_intervalos(fut[0], tray[0]["media"], tray[0]["sd"]),
+                                                  "interanual": tray[0].get("interanual")},
+             "coef": ([{"nombre": next(x["nombre"] for x in cands if x["id"] == i), "valor": _f(w_fin[i]), "ee": None, "p": None}
+                       for i in ids] if w_fin is not None else []),
+             "diagnostico": diagnostico(err.dropna().values),
+             "ecuacion": {"promedio": "ŷ = (1/M) Σ ŷₘ", "mediana": "ŷ = mediana(ŷ₁ … ŷ_M)",
+                          "inv_mse": "ŷ = Σ wₘ ŷₘ,  wₘ ∝ 1/ECMₘ (errores fuera de muestra previos)"}[met],
+             "propiedades": {"metodo": NOMBRE_COMB[met], "modelos_combinados": [x["nombre"] for x in cands],
+                             "rmse_backtest": _f(rmse),
+                             "nota": "Intervalos con el error fuera de muestra de la propia combinación."},
+             "backtest": {"fechas": [d.strftime("%Y-%m-%d") for d in bt.index], "pred": _lst(bt["pred"]),
+                          "real": _lst(bt["real"]), "sd": _lst(bt["sd"])}}
+        if interanual and nivel is not None:
+            ia = a_interanual(bt, nivel, freq)
+            r["backtest_interanual"] = {"fechas": [d.strftime("%Y-%m-%d") for d in ia.index],
+                                        "pred": _lst(ia["pred"]), "real": _lst(ia["real"])}
+        out.append(r)
+    return out
+
+
+def _sd_psi(phi, sigma2: float, h: int) -> list[float]:
+    """Desv. est. del error a k pasos de un AR: σ²·Σ ψⱼ² (pesos de impulso-respuesta)."""
+    phi = np.asarray(phi, float)
+    psi = [1.0]
+    for j in range(1, h):
+        psi.append(sum(phi[i - 1] * psi[j - i] for i in range(1, min(j, len(phi)) + 1)))
+    acum = np.cumsum(np.square(psi))
+    return [float(np.sqrt(sigma2 * a)) for a in acum]
+
+
+def _tray(fut, medias, sds, nivel, off) -> list[dict]:
+    """Trayectoria t+1…t+h; si `nivel` (objetivo en % m/m) también la tasa interanual implícita."""
+    out = []
+    I = nivel.copy() if nivel is not None else None
+    for f, mu, sd in zip(fut, medias, sds):
+        d = {"fecha": f.strftime("%Y-%m-%d"), "media": _f(mu), "sd": _f(sd)}
+        if I is not None and len(I) and mu is not None and not np.isnan(mu):
+            prev = I.get(f - off)
+            if prev is not None and not np.isnan(prev):
+                I.loc[f] = prev * (1 + mu / 100)
+                ref = I.get(f - pd.DateOffset(months=12))
+                if ref is not None and not np.isnan(ref):
+                    d["interanual"] = _f((I[f] / ref - 1) * 100)
+        out.append(d)
+    return out
 
 
 # ── utilidades ───────────────────────────────────────────────────────────────
